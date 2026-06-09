@@ -1,0 +1,16 @@
+{
+  "short_name": "Humbee",
+  "name": "Humbee Enterprise Portal",
+  "icons": [
+    {
+      "src": "logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#ffffff",
+  "theme_color": "#349688",
+  "display": "standalone",
+  "orientation": "portrait"
+}

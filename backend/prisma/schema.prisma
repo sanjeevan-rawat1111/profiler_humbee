@@ -1,0 +1,51 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String       @id @default(uuid())
+  username      String       @unique
+  passwordHash  String       @map("password_hash")
+  plainPassword String?      @map("plain_password")
+  role          String       @default("user") // "user" or "admin"
+  region        String
+  status        String       @default("active") // "active" or "inactive"
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  submissions   Submission[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  username  String
+  region    String?
+  eventType String   @map("event_type") // LOGIN | LOGOUT
+  status    String   // SUCCESS | FAIL
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
+
+model Submission {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  sapCode      String   @map("sap_code")
+  mobileNumber String   @map("mobile_number")
+  submittedAt  DateTime @default(now()) @map("submitted_at")
+  pwaUrl       String   @map("pwa_url")
+  apiResponse  String   @map("api_response") // Store complete JSON payload from the API response
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("submissions")
+}
