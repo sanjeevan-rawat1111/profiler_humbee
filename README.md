@@ -58,6 +58,16 @@ npm run dev
 ```
 Open [http://localhost:3000](http://localhost:3000) in your web browser.
 
+### 4. Render + Supabase (production)
+
+Render does not support IPv6, so Supabase **direct** connections on port `5432` (`db.PROJECT_REF.supabase.co`) fail with `P1001`. Use the **Supavisor pooler** on port `6543` instead.
+
+In Render → backend service → **Environment**, set `DATABASE_URL` to (from Supabase → **Connect** → Transaction pooler, URL-encode special characters in the password):
+
+```
+postgresql://postgres:PASSWORD@db.PROJECT_REF.supabase.co:6543/postgres?sslmode=require&pgbouncer=true&connect_timeout=30
+```
+
 ---
 
 ## Credentials
