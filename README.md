@@ -60,13 +60,16 @@ Open [http://localhost:3000](http://localhost:3000) in your web browser.
 
 ### 4. Render + Supabase (production)
 
-Render does not support IPv6, so Supabase **direct** connections on port `5432` (`db.PROJECT_REF.supabase.co`) fail with `P1001`. Use the **Supavisor pooler** on port `6543` instead.
+Render does not support IPv6, so use Supabase **Supavisor pooler** URLs (from Supabase → **Connect**). URL-encode special characters in the password.
 
-In Render → backend service → **Environment**, set `DATABASE_URL` to (from Supabase → **Connect** → Transaction pooler, URL-encode special characters in the password):
+Set both env vars on Render:
 
 ```
-postgresql://postgres:PASSWORD@db.PROJECT_REF.supabase.co:6543/postgres?sslmode=require&pgbouncer=true&connect_timeout=30
+DATABASE_URL=postgresql://postgres.PROJECT_REF:PASSWORD@aws-1-REGION.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require&connect_timeout=30
+DIRECT_URL=postgresql://postgres.PROJECT_REF:PASSWORD@aws-1-REGION.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=30
 ```
+
+`DATABASE_URL` is the transaction pooler for the running app. `DIRECT_URL` is the session pooler used by `prisma migrate deploy`.
 
 ---
 
