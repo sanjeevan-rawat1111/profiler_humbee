@@ -5,7 +5,7 @@ A production-ready full-stack React-Express-Prisma-PostgreSQL web application bu
 ## Tech Stack
 - **Frontend:** React (Vite, TS, Tailwind CSS, Axios, custom Service Worker PWA, canvas-confetti animations)
 - **Backend:** Node.js (Express, TS, JWT validation, bcrypt hashing, express-rate-limit, Zod payload validation)
-- **Database:** PostgreSQL (Neon) with Prisma ORM for schema migrations and seeding
+- **Database:** PostgreSQL (Supabase) with Prisma ORM for schema migrations and seeding
 
 ## Features
 - **Secure JWT Auth:** Session valid for 24 hours. Persists across page refreshes. Expired sessions automatically route back to `/login`.
@@ -30,11 +30,11 @@ npm install
 ```
 
 ### 2. Environment & Database Setup
-Copy the backend env template and set your Neon PostgreSQL connection string:
+Copy the backend env template and set your Supabase PostgreSQL connection string:
 ```bash
 cd ../backend
 cp .env.example .env
-# Edit .env and set DATABASE_URL to your Neon connection string
+# Edit .env and set DATABASE_URL to your Supabase connection string
 ```
 
 Run migrations and seed:
