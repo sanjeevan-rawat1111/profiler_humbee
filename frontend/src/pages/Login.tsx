@@ -165,23 +165,6 @@ const Login: React.FC = () => {
               )}
             </button>
           </form>
-
-          {/* Demo credentials */}
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-              Demo Credentials
-            </span>
-            <div className="flex justify-between text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-100">
-              <div>
-                <span className="font-semibold block text-slate-700">User</span>
-                <span>user / User1234</span>
-              </div>
-              <div className="border-l border-slate-200 pl-4">
-                <span className="font-semibold block text-slate-700">Admin</span>
-                <span>admin / Admin1234</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
