@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: profiler-humbee-api
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npx prisma migrate deploy && npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_SECRET_TOKEN
+        generateValue: true
+      - key: ADMIN_API_KEY
+        sync: false
+      - key: HUMBEE_API_KEY
+        sync: false
+      - key: HUMBEE_API_URL
+        value: https://api-dev.humbee.in/external-system/generate-pwa-module-access

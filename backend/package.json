@@ -11,11 +11,17 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
-    "db:seed": "ts-node src/prisma/seed.ts"
+    "db:seed": "ts-node src/prisma/seed.ts",
+    "db:seed:prod": "node dist/prisma/seed.js"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "@prisma/client": "^5.14.0",
     "prisma": "^5.14.0",
+    "rimraf": "^5.0.7",
+    "typescript": "^5.4.5",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -32,7 +38,6 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/morgan": "^1.9.9",
     "@types/node": "^20.12.12",
-    "rimraf": "^5.0.7",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.4.5"
