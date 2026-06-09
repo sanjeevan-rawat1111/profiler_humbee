@@ -1,5 +1,20 @@
 services:
   - type: web
+    name: profiler-humbee-web
+    runtime: static
+    rootDir: frontend
+    plan: free
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://profiler-humbee.onrender.com
+
+  - type: web
     name: profiler-humbee-api
     runtime: node
     rootDir: backend
