@@ -1,3 +1,5 @@
+export type DirectoryDownloadMode = 'normal' | 'master';
+
 export interface SubmissionFilters {
   search: string;
   user: string;

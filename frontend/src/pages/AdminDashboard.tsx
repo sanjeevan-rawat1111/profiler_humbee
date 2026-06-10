@@ -10,6 +10,7 @@ import AuditLogsTab from '../components/admin/AuditLogsTab';
 import UserManagementTab from '../components/admin/UserManagementTab';
 import { defaultFilters, defaultUserManagementFilters } from '../types/admin';
 import type {
+  DirectoryDownloadMode,
   SubmissionFilters,
   DirectoryRecord,
   AuditLogRecord,
@@ -32,6 +33,7 @@ const AdminDashboard: React.FC = () => {
   const [directoryPage, setDirectoryPage] = useState(1);
   const [sortBy, setSortBy] = useState('lastSubmission');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [downloadMode, setDownloadMode] = useState<DirectoryDownloadMode>('normal');
   const [loadingDirectory, setLoadingDirectory] = useState(false);
 
   const [users, setUsers] = useState<DBUser[]>([]);
@@ -180,17 +182,19 @@ const AdminDashboard: React.FC = () => {
               setFilters={setFilters}
               users={userOptions}
               loading={loadingDirectory}
+              downloadMode={downloadMode}
+              onDownloadModeChange={setDownloadMode}
               onClear={clearFilters}
               onFetch={fetchSubmissionData}
               onExportCsv={() => downloadExport(
                 '/api/internal/submissions/export-csv',
                 'user-directory.csv',
-                buildFilterParams(filters, { sortBy, sortDir })
+                buildFilterParams(filters, { sortBy, sortDir, downloadMode })
               )}
               onExportExcel={() => downloadExport(
                 '/api/internal/submissions/export-excel',
                 'user-directory.xls',
-                buildFilterParams(filters, { sortBy, sortDir })
+                buildFilterParams(filters, { sortBy, sortDir, downloadMode })
               )}
             />
           )}

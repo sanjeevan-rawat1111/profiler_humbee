@@ -1,6 +1,6 @@
 import React from 'react';
 import { Search, FilterX, RefreshCw, FileSpreadsheet, FileDown } from 'lucide-react';
-import type { SubmissionFilters as Filters } from '../../types/admin';
+import type { DirectoryDownloadMode, SubmissionFilters as Filters } from '../../types/admin';
 
 interface Props {
   filters: Filters;
@@ -8,6 +8,8 @@ interface Props {
   users: string[];
   loading?: boolean;
   showPeriod?: boolean;
+  downloadMode?: DirectoryDownloadMode;
+  onDownloadModeChange?: (mode: DirectoryDownloadMode) => void;
   onClear: () => void;
   onFetch: () => void;
   onExportCsv?: () => void;
@@ -20,6 +22,8 @@ const SubmissionFiltersBar: React.FC<Props> = ({
   users,
   loading,
   showPeriod,
+  downloadMode = 'normal',
+  onDownloadModeChange,
   onClear,
   onFetch,
   onExportCsv,
@@ -144,7 +148,33 @@ const SubmissionFiltersBar: React.FC<Props> = ({
           <FilterX className="w-3.5 h-3.5" />
           Clear Filters
         </button>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {onDownloadModeChange && (
+            <div className="flex rounded-lg border border-slate-200 overflow-hidden mr-1">
+              <button
+                type="button"
+                onClick={() => onDownloadModeChange('normal')}
+                className={`px-3 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+                  downloadMode === 'normal'
+                    ? 'bg-slate-800 text-white'
+                    : 'bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                Normal Download
+              </button>
+              <button
+                type="button"
+                onClick={() => onDownloadModeChange('master')}
+                className={`px-3 py-2 text-xs font-semibold transition-colors cursor-pointer border-l border-slate-200 ${
+                  downloadMode === 'master'
+                    ? 'bg-slate-800 text-white'
+                    : 'bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                Master Download
+              </button>
+            </div>
+          )}
           <button
             onClick={onFetch}
             className="px-3.5 py-2 bg-humbee-500 hover:bg-humbee-600 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"

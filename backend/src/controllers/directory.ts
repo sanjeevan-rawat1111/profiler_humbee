@@ -19,34 +19,93 @@ type DirectoryRow = {
 };
 
 function aggregateDirectory(rows: SubmissionRow[]): DirectoryRow[] {
-  const byUser = new Map<string, {
+  const byCombo = new Map<string, {
+    userId: string;
     userMobileNumber: string;
     region: string;
+    sapCode: string;
+    mobileNumber: string;
     submissions: SubmissionRow[];
   }>();
 
   rows.forEach((row) => {
     if (!row.user) return;
-    if (!byUser.has(row.userId)) {
-      byUser.set(row.userId, { userMobileNumber: row.user.mobileNumber, region: row.user.region, submissions: [] });
+    const key = `${row.userId}\0${row.sapCode}\0${row.mobileNumber}`;
+    if (!byCombo.has(key)) {
+      byCombo.set(key, {
+        userId: row.userId,
+        userMobileNumber: row.user.mobileNumber,
+        region: row.user.region,
+        sapCode: row.sapCode,
+        mobileNumber: row.mobileNumber,
+        submissions: [],
+      });
     }
-    byUser.get(row.userId)?.submissions.push(row);
+    byCombo.get(key)?.submissions.push(row);
   });
 
-  return Array.from(byUser.entries()).map(([userId, data]) => {
+  return Array.from(byCombo.values()).map((data) => {
     const sorted = [...data.submissions].sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime());
-    const latest = sorted[0];
     const first = sorted[sorted.length - 1];
+    const latest = sorted[0];
     return {
-      userId,
+      userId: data.userId,
       userMobileNumber: data.userMobileNumber,
       region: data.region,
-      sapCode: latest.sapCode,
-      mobileNumber: latest.mobileNumber,
+      sapCode: data.sapCode,
+      mobileNumber: data.mobileNumber,
       submissionCount: sorted.length,
       firstSubmission: first.submittedAt.toISOString(),
       lastSubmission: latest.submittedAt.toISOString(),
     };
+  });
+}
+
+type MasterRow = {
+  userMobileNumber: string;
+  region: string;
+  sapCode: string;
+  mobileNumber: string;
+  timestamp: string;
+};
+
+function buildMasterRows(rows: SubmissionRow[]): MasterRow[] {
+  return rows
+    .filter((row) => row.user)
+    .map((row) => ({
+      userMobileNumber: row.user!.mobileNumber,
+      region: row.user!.region,
+      sapCode: row.sapCode,
+      mobileNumber: row.mobileNumber,
+      timestamp: row.submittedAt.toISOString(),
+    }));
+}
+
+function sortMasterRows(rows: MasterRow[], sortBy: string, sortDir: string) {
+  const dir = sortDir === 'asc' ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    let cmp = 0;
+    switch (sortBy) {
+      case 'userMobileNumber':
+      case 'username':
+        cmp = a.userMobileNumber.localeCompare(b.userMobileNumber);
+        break;
+      case 'region':
+        cmp = a.region.localeCompare(b.region);
+        break;
+      case 'sapCode':
+        cmp = a.sapCode.localeCompare(b.sapCode);
+        break;
+      case 'mobileNumber':
+        cmp = a.mobileNumber.localeCompare(b.mobileNumber);
+        break;
+      case 'firstSubmission':
+      case 'lastSubmission':
+      default:
+        cmp = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+        break;
+    }
+    return cmp * dir;
   });
 }
 
@@ -111,12 +170,19 @@ export async function getSubmissionDirectory(req: Request, res: Response) {
 
 export async function getUserSubmissionDetails(req: Request, res: Response) {
   const { userId } = req.params;
+  const groupSapCode = String(req.query.groupSapCode || '');
+  const groupVcpMobile = String(req.query.groupVcpMobile || '');
   const filters = parseFilterQuery(req.query);
 
   try {
     const rows = await fetchFilteredSubmissions(prisma, filters);
     const details = rows
-      .filter((row) => row.userId === userId)
+      .filter((row) =>
+        row.userId === userId
+        && row.sapCode === groupSapCode
+        && row.mobileNumber === groupVcpMobile
+      )
+      .sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime())
       .map((row) => ({
         id: row.id,
         timestamp: row.submittedAt.toISOString(),
@@ -136,8 +202,20 @@ export async function exportDirectoryCsv(req: Request, res: Response) {
     const filters = parseFilterQuery(req.query);
     const sortBy = String(req.query.sortBy || 'lastSubmission');
     const sortDir = String(req.query.sortDir || 'desc');
-    const rows = sortDirectory(aggregateDirectory(await fetchFilteredSubmissions(prisma, filters)), sortBy, sortDir);
+    const downloadMode = String(req.query.downloadMode || 'normal');
+    const submissions = await fetchFilteredSubmissions(prisma, filters);
 
+    if (downloadMode === 'master') {
+      const rows = sortMasterRows(buildMasterRows(submissions), sortBy, sortDir);
+      return sendCsv(
+        res,
+        'user-directory.csv',
+        ['User', 'Region', 'SAP Code', 'VCP Mobile', 'Timestamp'],
+        rows.map((r) => [r.userMobileNumber, r.region, r.sapCode, r.mobileNumber, r.timestamp])
+      );
+    }
+
+    const rows = sortDirectory(aggregateDirectory(submissions), sortBy, sortDir);
     return sendCsv(
       res,
       'user-directory.csv',
@@ -155,8 +233,20 @@ export async function exportDirectoryExcel(req: Request, res: Response) {
     const filters = parseFilterQuery(req.query);
     const sortBy = String(req.query.sortBy || 'lastSubmission');
     const sortDir = String(req.query.sortDir || 'desc');
-    const rows = sortDirectory(aggregateDirectory(await fetchFilteredSubmissions(prisma, filters)), sortBy, sortDir);
+    const downloadMode = String(req.query.downloadMode || 'normal');
+    const submissions = await fetchFilteredSubmissions(prisma, filters);
 
+    if (downloadMode === 'master') {
+      const rows = sortMasterRows(buildMasterRows(submissions), sortBy, sortDir);
+      return sendExcel(
+        res,
+        'user-directory.xls',
+        ['User', 'Region', 'SAP Code', 'VCP Mobile', 'Timestamp'],
+        rows.map((r) => [r.userMobileNumber, r.region, r.sapCode, r.mobileNumber, r.timestamp])
+      );
+    }
+
+    const rows = sortDirectory(aggregateDirectory(submissions), sortBy, sortDir);
     return sendExcel(
       res,
       'user-directory.xls',

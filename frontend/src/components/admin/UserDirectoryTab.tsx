@@ -46,13 +46,19 @@ const UserDirectoryTab: React.FC<Props> = ({
     setLoadingDetails(true);
     try {
       const res = await api.get(`/api/internal/submissions/directory/${record.userId}`, {
-        params: buildFilterParams(filters),
+        params: buildFilterParams(filters, {
+          groupSapCode: record.sapCode,
+          groupVcpMobile: record.mobileNumber,
+        }),
       });
       setDetails(res.data.data ?? []);
     } finally {
       setLoadingDetails(false);
     }
   };
+
+  const rowKey = (record: DirectoryRecord) =>
+    `${record.userId}-${record.sapCode}-${record.mobileNumber}`;
 
   const SortIcon = ({ field }: { field: string }) => (
     sortBy === field ? (
@@ -85,7 +91,7 @@ const UserDirectoryTab: React.FC<Props> = ({
               <tbody className="divide-y divide-slate-100 text-slate-600">
                 {records.map((record) => (
                   <tr
-                    key={record.userId}
+                    key={rowKey(record)}
                     onClick={() => openDetails(record)}
                     className="hover:bg-amber-50/40 transition-colors cursor-pointer"
                   >
@@ -128,9 +134,19 @@ const UserDirectoryTab: React.FC<Props> = ({
         <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={() => setSelectedUser(null)}>
           <div className="w-full max-w-lg h-full bg-white shadow-2xl p-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-start mb-4">
-              <div>
+              <div className="space-y-1">
                 <h3 className="text-lg font-bold text-slate-800">Submission Details</h3>
-                <p className="text-sm text-slate-500">User: <span className="font-mono font-semibold text-slate-700">{selectedUser.userMobileNumber}</span></p>
+                <p className="text-sm text-slate-500">
+                  User: <span className="font-mono font-semibold text-slate-700">{selectedUser.userMobileNumber}</span>
+                </p>
+                <p className="text-sm text-slate-500">
+                  SAP Code: <span className="font-mono font-semibold text-humbee-600">{selectedUser.sapCode}</span>
+                  {' · '}
+                  VCP Mobile: <span className="font-mono font-semibold text-slate-700">{selectedUser.mobileNumber}</span>
+                </p>
+                <p className="text-sm text-slate-500">
+                  Submission Count: <span className="font-semibold text-slate-700">{selectedUser.submissionCount}</span>
+                </p>
               </div>
               <button onClick={() => setSelectedUser(null)} className="p-2 rounded-lg hover:bg-slate-100 cursor-pointer">
                 <X className="w-4 h-4" />
