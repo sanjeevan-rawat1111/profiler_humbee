@@ -1,3 +1,5 @@
+import { isExcludedAnalyticsMobile } from '../config/excludedAnalyticsUsers';
+
 export type SubmissionRow = {
   id: string;
   sapCode: string;
@@ -8,7 +10,8 @@ export type SubmissionRow = {
 };
 
 export function isAnalyticsUser(row: SubmissionRow) {
-  return row.user?.role === 'user';
+  if (!row.user || row.user.role !== 'user') return false;
+  return !isExcludedAnalyticsMobile(row.user.mobileNumber);
 }
 
 export function filterAnalyticsRows(rows: SubmissionRow[]) {

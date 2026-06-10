@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import prisma from '../prisma/client';
+import { excludedAnalyticsMobileNumbers, isExcludedAnalyticsMobile } from '../config/excludedAnalyticsUsers';
 import { sendCsv, sendExcel } from '../utils/exportHelpers';
 import { parseArrayParam } from '../utils/dashboardAnalytics';
 
@@ -268,7 +269,14 @@ export async function getSubmissions(req: Request, res: Response) {
     if (mobileFilter) where.mobileNumber = { contains: String(mobileFilter) };
     const submittedAt = parseDateRange(date);
     if (submittedAt) where.submittedAt = submittedAt;
-    if (user) where.user = { mobileNumber: { contains: String(user) } };
+    where.user = user
+      ? {
+          AND: [
+            { mobileNumber: { contains: String(user) } },
+            { mobileNumber: { notIn: excludedAnalyticsMobileNumbers() } },
+          ],
+        }
+      : { mobileNumber: { notIn: excludedAnalyticsMobileNumbers() } };
 
     const [total, submissions] = await prisma.$transaction([
       prisma.submission.count({ where }),
@@ -322,7 +330,10 @@ export async function getSubmissionKpis(req: Request, res: Response) {
     if (submittedAt) baseWhere.submittedAt = submittedAt;
 
     const regularUsers = await prisma.user.findMany({
-      where: { role: 'user' },
+      where: {
+        role: 'user',
+        mobileNumber: { notIn: excludedAnalyticsMobileNumbers() },
+      },
       select: { id: true, mobileNumber: true },
       orderBy: { mobileNumber: 'asc' },
     });
@@ -330,7 +341,10 @@ export async function getSubmissionKpis(req: Request, res: Response) {
     const rankingRows: SubmissionKpiRow[] = await prisma.submission.findMany({
       where: {
         ...baseWhere,
-        user: { role: 'user' },
+        user: {
+          role: 'user',
+          mobileNumber: { notIn: excludedAnalyticsMobileNumbers() },
+        },
       },
       select: {
         sapCode: true,
@@ -342,7 +356,7 @@ export async function getSubmissionKpis(req: Request, res: Response) {
 
     const rankingByUser = new Map<string, Set<string>>();
     rankingRows.forEach((row) => {
-      if (!row.user || row.user.role !== 'user') return;
+      if (!row.user || row.user.role !== 'user' || isExcludedAnalyticsMobile(row.user.mobileNumber)) return;
       const userMobile = row.user.mobileNumber;
       if (!rankingByUser.has(userMobile)) rankingByUser.set(userMobile, new Set());
       rankingByUser.get(userMobile)?.add(uniqueSubmissionKey(row));
@@ -360,10 +374,16 @@ export async function getSubmissionKpis(req: Request, res: Response) {
       .map((regularUser) => ({ mobileNumber: regularUser.mobileNumber, uniqueCount: 0 }));
 
     const trendRange = getTrendDateRange(period, customStart, customEnd);
+    const trendUserFilter = trendUser
+      ? { mobileNumber: { contains: String(trendUser) } }
+      : { mobileNumber: { notIn: excludedAnalyticsMobileNumbers() } };
     const trendWhere: Record<string, unknown> = {
       ...baseWhere,
       ...(trendRange ? { submittedAt: trendRange } : {}),
-      ...(trendUser ? { user: { mobileNumber: { contains: String(trendUser) } } } : {}),
+      user: {
+        role: 'user',
+        ...trendUserFilter,
+      },
     };
 
     const trendRows: SubmissionKpiRow[] = await prisma.submission.findMany({
@@ -379,7 +399,7 @@ export async function getSubmissionKpis(req: Request, res: Response) {
 
     const trendByDay = new Map<string, Set<string>>();
     trendRows.forEach((row) => {
-      if (!row.user || row.user.role !== 'user') return;
+      if (!row.user || row.user.role !== 'user' || isExcludedAnalyticsMobile(row.user.mobileNumber)) return;
       const day = toDateKey(row.submittedAt);
       if (!trendByDay.has(day)) trendByDay.set(day, new Set());
       trendByDay.get(day)?.add(uniqueSubmissionKey(row));
@@ -428,7 +448,14 @@ export async function exportSubmissions(req: Request, res: Response) {
     if (mobileFilter) where.mobileNumber = { contains: String(mobileFilter) };
     const submittedAt = parseDateRange(date);
     if (submittedAt) where.submittedAt = submittedAt;
-    if (user) where.user = { mobileNumber: { contains: String(user) } };
+    where.user = user
+      ? {
+          AND: [
+            { mobileNumber: { contains: String(user) } },
+            { mobileNumber: { notIn: excludedAnalyticsMobileNumbers() } },
+          ],
+        }
+      : { mobileNumber: { notIn: excludedAnalyticsMobileNumbers() } };
 
     const submissions = await prisma.submission.findMany({
       where,

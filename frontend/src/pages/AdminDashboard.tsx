@@ -17,6 +17,7 @@ import type {
   DBUser,
   UserManagementFilters,
 } from '../types/admin';
+import { EXCLUDED_ANALYTICS_USERS } from '../constants/excludedAnalyticsUsers';
 import { buildFilterParams, buildUserMgmtParams, downloadExport } from '../utils/adminApi';
 
 type MainTab = 'submissions' | 'users' | 'audit';
@@ -48,7 +49,6 @@ const AdminDashboard: React.FC = () => {
   const [auditFilters, setAuditFilters] = useState({ user: '', region: '', eventType: '', status: '', fromDate: '', toDate: '' });
 
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   const fetchDirectory = useCallback(async () => {
     setLoadingDirectory(true);
@@ -144,9 +144,11 @@ const AdminDashboard: React.FC = () => {
     if (mainTab === 'audit') fetchAuditLogs();
   }, [auditPage]);
 
-  const userOptions = mobileNumberFilterOptions.length > 0
+  const excludedAnalytics = new Set(EXCLUDED_ANALYTICS_USERS);
+  const userOptions = (mobileNumberFilterOptions.length > 0
     ? mobileNumberFilterOptions
-    : users.filter((u) => u.role === 'user').map((u) => u.mobileNumber);
+    : users.filter((u) => u.role === 'user').map((u) => u.mobileNumber)
+  ).filter((mobile) => !excludedAnalytics.has(mobile));
 
   return (
     <AdminLayout
@@ -161,12 +163,6 @@ const AdminDashboard: React.FC = () => {
           <span className="font-medium">{error}</span>
         </div>
       )}
-      {success && (
-        <div className="mb-4 p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-800 text-xs font-semibold">
-          {success}
-        </div>
-      )}
-
       {mainTab === 'submissions' && (
         <div className="space-y-6">
           {submissionTab === 'directory' && (
@@ -229,7 +225,6 @@ const AdminDashboard: React.FC = () => {
           onExportCsv={() => downloadExport('/api/internal/users/export-csv', 'users.csv', buildUserMgmtParams(userMgmtFilters))}
           onExportExcel={() => downloadExport('/api/internal/users/export-excel', 'users.xls', buildUserMgmtParams(userMgmtFilters))}
           setError={setError}
-          setSuccess={setSuccess}
         />
       )}
 

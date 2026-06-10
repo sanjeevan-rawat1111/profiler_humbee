@@ -1,4 +1,5 @@
 import prisma from '../prisma/client';
+import { isExcludedAnalyticsMobile } from '../config/excludedAnalyticsUsers';
 
 export async function recordAuditLog(params: {
   userId?: string | null;
@@ -8,6 +9,8 @@ export async function recordAuditLog(params: {
   status: 'SUCCESS' | 'FAIL';
   reason?: string | null;
 }) {
+  if (isExcludedAnalyticsMobile(params.username)) return;
+
   try {
     await prisma.auditLog.create({
       data: {

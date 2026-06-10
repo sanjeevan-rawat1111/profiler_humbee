@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma/client';
+import { excludedAnalyticsMobileNumbers } from '../config/excludedAnalyticsUsers';
 import { sendCsv, sendExcel } from '../utils/exportHelpers';
 
 function buildAuditWhere(query: Record<string, unknown>) {
@@ -11,7 +12,15 @@ function buildAuditWhere(query: Record<string, unknown>) {
   const fromDate = String(query.fromDate || '').trim();
   const toDate = String(query.toDate || '').trim();
 
-  if (user) where.username = { contains: user };
+  const usernameClauses: Record<string, unknown>[] = [
+    { username: { notIn: excludedAnalyticsMobileNumbers() } },
+  ];
+  if (user) usernameClauses.unshift({ username: { contains: user } });
+  if (usernameClauses.length === 1) {
+    Object.assign(where, usernameClauses[0]);
+  } else {
+    where.AND = usernameClauses;
+  }
   if (region) where.region = { contains: region };
   if (eventType) where.eventType = eventType;
   if (status) where.status = status;

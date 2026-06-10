@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Pencil, Eye, EyeOff, FileDown, FileSpreadsheet } from 'lucide-react';
 import api from '../../services/api';
 import SearchableMultiSelect from './SearchableMultiSelect';
@@ -21,7 +21,6 @@ interface Props {
   onExportCsv: () => void;
   onExportExcel: () => void;
   setError: (msg: string | null) => void;
-  setSuccess: (msg: string | null) => void;
 }
 
 const UserManagementTab: React.FC<Props> = ({
@@ -35,8 +34,8 @@ const UserManagementTab: React.FC<Props> = ({
   onExportCsv,
   onExportExcel,
   setError,
-  setSuccess,
 }) => {
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<DBUser | null>(null);
   const [form, setForm] = useState({
@@ -49,6 +48,14 @@ const UserManagementTab: React.FC<Props> = ({
   const [fieldErrors, setFieldErrors] = useState<{ mobileNumber?: string }>({});
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [passwordCache, setPasswordCache] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = window.setTimeout(() => setSuccessMessage(null), 2000);
+    return () => window.clearTimeout(timer);
+  }, [successMessage]);
+
+  useEffect(() => () => setSuccessMessage(null), []);
 
   const selectedStatuses = filters.statuses.map(
     (status) => status.charAt(0).toUpperCase() + status.slice(1),
@@ -121,7 +128,7 @@ const UserManagementTab: React.FC<Props> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSuccess(null);
+    setSuccessMessage(null);
 
     const errs = validateForm();
     setFieldErrors(errs);
@@ -140,7 +147,7 @@ const UserManagementTab: React.FC<Props> = ({
         if (form.password) {
           setPasswordCache((prev) => ({ ...prev, [editingUser.id]: form.password }));
         }
-        setSuccess('User updated successfully');
+        setSuccessMessage('User updated successfully');
       } else {
         if (!form.password) {
           setError('Password is required for new users');
@@ -151,7 +158,7 @@ const UserManagementTab: React.FC<Props> = ({
         if (created?.id) {
           setPasswordCache((prev) => ({ ...prev, [created.id]: form.password }));
         }
-        setSuccess('User created successfully');
+        setSuccessMessage('User created successfully');
       }
       setShowForm(false);
       onRefresh();
@@ -168,7 +175,7 @@ const UserManagementTab: React.FC<Props> = ({
     if (!window.confirm('Delete this user?')) return;
     try {
       await api.delete(`/api/internal/users/${id}`);
-      setSuccess('User deleted');
+      setSuccessMessage('User deleted');
       onRefresh();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to delete user');
@@ -179,6 +186,12 @@ const UserManagementTab: React.FC<Props> = ({
 
   return (
     <div className="space-y-6">
+      {successMessage && (
+        <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-800 text-xs font-semibold">
+          {successMessage}
+        </div>
+      )}
+
       <div className="flex flex-wrap justify-between items-center gap-3">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">User Management</h2>

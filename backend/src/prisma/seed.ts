@@ -16,6 +16,12 @@ const DEFAULT_USERS = [
     role: 'user' as const,
     region: 'HUMBEE',
   },
+  {
+    mobileNumber: '0000000000',
+    password: 'Ping@20p95',
+    role: 'user' as const,
+    region: 'SYSTEM',
+  },
 ];
 
 async function ensureUser(

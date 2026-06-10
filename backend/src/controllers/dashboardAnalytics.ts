@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma/client';
+import { excludedAnalyticsMobileNumbers, isExcludedAnalyticsMobile } from '../config/excludedAnalyticsUsers';
 import {
   countUniqueSubmissions,
   fetchFilteredSubmissions,
@@ -38,7 +39,10 @@ async function buildFilterOptions(allRows: ReturnType<typeof prepareAnalyticsRow
     if (row.user?.region) regionSet.add(row.user.region);
   });
 
-  const userWhere: Record<string, unknown> = { role: 'user' };
+  const userWhere: Record<string, unknown> = {
+    role: 'user',
+    mobileNumber: { notIn: excludedAnalyticsMobileNumbers() },
+  };
   if (regions.length) userWhere.region = { in: regions };
 
   const dbUsers = await prisma.user.findMany({
@@ -63,9 +67,16 @@ async function buildInactiveUsers(
   regions: string[],
   users: string[],
 ) {
-  const userWhere: Record<string, unknown> = { role: 'user' };
+  const userWhere: Record<string, unknown> = {
+    role: 'user',
+    mobileNumber: { notIn: excludedAnalyticsMobileNumbers() },
+  };
   if (regions.length) userWhere.region = { in: regions };
-  if (users.length) userWhere.mobileNumber = { in: users };
+  if (users.length) {
+    userWhere.mobileNumber = {
+      in: users.filter((mobile) => !isExcludedAnalyticsMobile(mobile)),
+    };
+  }
 
   const scopedUsers = await prisma.user.findMany({
     where: userWhere,

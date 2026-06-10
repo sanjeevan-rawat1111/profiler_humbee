@@ -3,6 +3,7 @@ import prisma from '../prisma/client';
 import { sendCsv, sendExcel } from '../utils/exportHelpers';
 import {
   fetchFilteredSubmissions,
+  filterAnalyticsRows,
   parseFilterQuery,
   SubmissionRow,
 } from '../utils/submissionFilters';
@@ -150,7 +151,7 @@ export async function getSubmissionDirectory(req: Request, res: Response) {
   const sortDir = String(req.query.sortDir || 'desc');
 
   try {
-    const rows = await fetchFilteredSubmissions(prisma, filters);
+    const rows = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters));
     const aggregated = sortDirectory(aggregateDirectory(rows), sortBy, sortDir);
     const total = aggregated.length;
     const start = (page - 1) * limit;
@@ -175,7 +176,7 @@ export async function getUserSubmissionDetails(req: Request, res: Response) {
   const filters = parseFilterQuery(req.query);
 
   try {
-    const rows = await fetchFilteredSubmissions(prisma, filters);
+    const rows = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters));
     const details = rows
       .filter((row) =>
         row.userId === userId
@@ -203,7 +204,7 @@ export async function exportDirectoryCsv(req: Request, res: Response) {
     const sortBy = String(req.query.sortBy || 'lastSubmission');
     const sortDir = String(req.query.sortDir || 'desc');
     const downloadMode = String(req.query.downloadMode || 'normal');
-    const submissions = await fetchFilteredSubmissions(prisma, filters);
+    const submissions = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters));
 
     if (downloadMode === 'master') {
       const rows = sortMasterRows(buildMasterRows(submissions), sortBy, sortDir);
@@ -234,7 +235,7 @@ export async function exportDirectoryExcel(req: Request, res: Response) {
     const sortBy = String(req.query.sortBy || 'lastSubmission');
     const sortDir = String(req.query.sortDir || 'desc');
     const downloadMode = String(req.query.downloadMode || 'normal');
-    const submissions = await fetchFilteredSubmissions(prisma, filters);
+    const submissions = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters));
 
     if (downloadMode === 'master') {
       const rows = sortMasterRows(buildMasterRows(submissions), sortBy, sortDir);

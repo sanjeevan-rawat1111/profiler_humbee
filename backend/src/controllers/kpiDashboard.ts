@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma/client';
+import { excludedAnalyticsMobileNumbers } from '../config/excludedAnalyticsUsers';
 import { sendCsv, sendExcel } from '../utils/exportHelpers';
 import {
   countUniqueSubmissions,
@@ -128,7 +129,10 @@ export async function getKpiDashboard(req: Request, res: Response) {
     }));
 
     const allUsers = await prisma.user.findMany({
-      where: { role: 'user' },
+      where: {
+        role: 'user',
+        mobileNumber: { notIn: excludedAnalyticsMobileNumbers() },
+      },
       select: { mobileNumber: true, region: true },
       orderBy: { mobileNumber: 'asc' },
     });
