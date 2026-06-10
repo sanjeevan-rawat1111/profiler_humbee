@@ -64,7 +64,7 @@ const Login: React.FC = () => {
 
         <div className="premium-card p-8 md:p-10 bg-white/90 backdrop-blur-md">
           <div className="mb-6">
-            <h1 className="text-xl font-bold text-slate-800 tracking-tight">Customer Profiler</h1>
+            <h1 className="text-xl font-bold text-slate-800 tracking-tight">Network Officer Login</h1>
             <p className="text-slate-400 text-xs mt-1">Sign in to access the portal.</p>
           </div>
 

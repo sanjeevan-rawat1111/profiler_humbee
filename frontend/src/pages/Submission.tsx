@@ -119,7 +119,7 @@ const Submission: React.FC = () => {
                 <input
                   id="sap-code"
                   type="text"
-                  placeholder="e.g. SAP100938"
+                  placeholder="e.g. 0077100938"
                   value={sapCode}
                   onChange={(e) => { setSapCode(e.target.value); setFieldErrors(p => ({ ...p, sapCode: undefined })); }}
                   disabled={isSubmitting}
