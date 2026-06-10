@@ -21,7 +21,7 @@ const Submission: React.FC = () => {
     const errs: { sapCode?: string; mobileNumber?: string } = {};
     if (!sapCode.trim()) errs.sapCode = 'SAP Code is required';
     if (!mobileNumber.trim()) {
-      errs.mobileNumber = 'Mobile Number is required';
+      errs.mobileNumber = 'VCP Mobile Number is required';
     } else if (!/^[0-9]{10}$/.test(mobileNumber.trim())) {
       errs.mobileNumber = 'Must be exactly 10 digits';
     }
@@ -135,12 +135,12 @@ const Submission: React.FC = () => {
               {/* Mobile Number */}
               <div className="space-y-1.5">
                 <label htmlFor="mobile-number" className="text-xs font-semibold text-slate-600 block">
-                  Mobile Number
+                  VCP Mobile
                 </label>
                 <input
                   id="mobile-number"
                   type="tel"
-                  placeholder="10-digit number"
+                  placeholder="Enter VCP mobile number"
                   value={mobileNumber}
                   onChange={(e) => { setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10)); setFieldErrors(p => ({ ...p, mobileNumber: undefined })); }}
                   disabled={isSubmitting}

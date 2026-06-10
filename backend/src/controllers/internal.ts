@@ -442,7 +442,7 @@ export async function exportSubmissions(req: Request, res: Response) {
       orderBy: { submittedAt: 'desc' },
     });
 
-    const header = 'ID,User Mobile Number,SAP Code,Customer Mobile Number,Submitted At\n';
+    const header = 'ID,User,SAP Code,VCP Mobile,Submitted At\n';
     const rows = submissions.map(s =>
       [
         s.id,

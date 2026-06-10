@@ -141,7 +141,7 @@ export async function exportDirectoryCsv(req: Request, res: Response) {
     return sendCsv(
       res,
       'user-directory.csv',
-      ['User Mobile Number', 'Region', 'SAP Code', 'Customer Mobile Number', 'Submission Count', 'First Submission', 'Last Submission'],
+      ['User', 'Region', 'SAP Code', 'VCP Mobile', 'Submission Count', 'First Submission', 'Last Submission'],
       rows.map((r) => [r.userMobileNumber, r.region, r.sapCode, r.mobileNumber, r.submissionCount, r.firstSubmission, r.lastSubmission])
     );
   } catch (error) {
@@ -160,7 +160,7 @@ export async function exportDirectoryExcel(req: Request, res: Response) {
     return sendExcel(
       res,
       'user-directory.xls',
-      ['User Mobile Number', 'Region', 'SAP Code', 'Customer Mobile Number', 'Submission Count', 'First Submission', 'Last Submission'],
+      ['User', 'Region', 'SAP Code', 'VCP Mobile', 'Submission Count', 'First Submission', 'Last Submission'],
       rows.map((r) => [r.userMobileNumber, r.region, r.sapCode, r.mobileNumber, r.submissionCount, r.firstSubmission, r.lastSubmission])
     );
   } catch (error) {

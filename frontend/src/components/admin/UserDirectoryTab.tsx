@@ -17,10 +17,10 @@ interface Props {
 }
 
 const sortableColumns = [
-  { key: 'userMobileNumber', label: 'Mobile Number' },
+  { key: 'userMobileNumber', label: 'User' },
   { key: 'region', label: 'Region' },
   { key: 'sapCode', label: 'SAP Code' },
-  { key: 'mobileNumber', label: 'Mobile Number' },
+  { key: 'mobileNumber', label: 'VCP Mobile' },
   { key: 'submissionCount', label: 'Submission Count' },
   { key: 'firstSubmission', label: 'First Submission' },
   { key: 'lastSubmission', label: 'Last Submission' },
@@ -129,8 +129,8 @@ const UserDirectoryTab: React.FC<Props> = ({
           <div className="w-full max-w-lg h-full bg-white shadow-2xl p-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-start mb-4">
               <div>
-                <h3 className="text-lg font-bold text-slate-800">User Submission Details</h3>
-                <p className="text-sm text-slate-500 font-mono">{selectedUser.userMobileNumber}</p>
+                <h3 className="text-lg font-bold text-slate-800">Submission Details</h3>
+                <p className="text-sm text-slate-500">User: <span className="font-mono font-semibold text-slate-700">{selectedUser.userMobileNumber}</span></p>
               </div>
               <button onClick={() => setSelectedUser(null)} className="p-2 rounded-lg hover:bg-slate-100 cursor-pointer">
                 <X className="w-4 h-4" />
@@ -143,7 +143,7 @@ const UserDirectoryTab: React.FC<Props> = ({
                 <thead>
                   <tr className="text-slate-500 border-b">
                     <th className="p-2 text-left">SAP Code</th>
-                    <th className="p-2 text-left">Mobile Number</th>
+                    <th className="p-2 text-left">VCP Mobile</th>
                     <th className="p-2 text-left">Timestamp</th>
                   </tr>
                 </thead>

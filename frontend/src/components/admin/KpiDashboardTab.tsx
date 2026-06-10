@@ -169,7 +169,7 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
           <thead>
             <tr className="bg-slate-50 text-slate-500">
               <th className="p-4 text-left">Rank</th>
-              <th className="p-4 text-left">Mobile Number</th>
+              <th className="p-4 text-left">User</th>
               <th className="p-4 text-left">Unique Submissions</th>
               <th className="p-4 text-left">First Submission</th>
               <th className="p-4 text-left">Last Submission</th>
@@ -197,9 +197,9 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
           <thead>
             <tr className="bg-slate-50 text-slate-500">
               <th className="p-4 text-left">Timestamp</th>
-              <th className="p-4 text-left">Mobile Number</th>
+              <th className="p-4 text-left">User</th>
               <th className="p-4 text-left">SAP Code</th>
-              <th className="p-4 text-left">Mobile Number</th>
+              <th className="p-4 text-left">VCP Mobile</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
