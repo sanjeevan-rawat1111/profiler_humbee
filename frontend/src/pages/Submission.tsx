@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
-import { LogOut, Send, AlertCircle, Sparkles } from 'lucide-react';
+import { LogOut, Send, AlertCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 const Submission: React.FC = () => {
@@ -65,12 +65,12 @@ const Submission: React.FC = () => {
         <div className="flex items-center gap-3">
           <img src="/logo.svg" alt="Humbee" className="h-8 object-contain" />
           <span className="h-4 w-px bg-slate-200 hidden sm:block" />
-          <span className="text-xs font-semibold text-slate-400 hidden sm:block tracking-wider uppercase">Portal</span>
+          <span className="text-xs font-semibold text-slate-400 hidden sm:block tracking-wider uppercase">customer profiler</span>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
-            <span className="text-xs font-bold text-slate-700 block capitalize">{user?.username}</span>
+            <span className="text-xs font-bold text-slate-700 block">{user?.mobileNumber}</span>
             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">{user?.role}</span>
           </div>
           <button
@@ -91,10 +91,8 @@ const Submission: React.FC = () => {
         <div className="w-full max-w-[500px]">
           <div className="premium-card p-8 md:p-10 bg-white/95 backdrop-blur-md">
             {/* Header */}
-            <div className="mb-8">
-              <div className="inline-flex p-2.5 bg-humbee-50 rounded-xl text-humbee-500 mb-4">
-                <Sparkles className="w-5 h-5" />
-              </div>
+            <div className="mb-8 text-center">
+              <img src="/logo.svg" alt="HumBee" className="h-10 object-contain mx-auto mb-4" />
               <h2 className="text-2xl font-bold text-slate-800 tracking-tight">HumBee</h2>
               <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
                 Enter the customer SAP Code and Mobile Number, then click Submit to generate and launch the PWA.

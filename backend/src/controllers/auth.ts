@@ -6,39 +6,39 @@ import { AuthenticatedRequest } from '../middleware/auth';
 import { recordAuditLog } from '../utils/auditLog';
 
 export async function login(req: Request, res: Response) {
-  const { username, password } = req.body;
+  const { mobileNumber, password } = req.body;
 
   try {
-    const user = await prisma.user.findUnique({ where: { username } });
+    const user = await prisma.user.findUnique({ where: { mobileNumber } });
 
     if (!user) {
       await recordAuditLog({
-        username,
+        username: mobileNumber,
         eventType: 'LOGIN',
         status: 'FAIL',
-        reason: 'Invalid username or password',
+        reason: 'Invalid mobile number or password',
       });
-      return res.status(401).json({ success: false, message: 'Invalid username or password' });
+      return res.status(401).json({ success: false, message: 'Invalid mobile number or password' });
     }
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
       await recordAuditLog({
         userId: user.id,
-        username,
+        username: mobileNumber,
         region: user.region,
         eventType: 'LOGIN',
         status: 'FAIL',
-        reason: 'Invalid username or password',
+        reason: 'Invalid mobile number or password',
       });
-      return res.status(401).json({ success: false, message: 'Invalid username or password' });
+      return res.status(401).json({ success: false, message: 'Invalid mobile number or password' });
     }
 
-    const token = generateToken({ userId: user.id, username: user.username, role: user.role });
+    const token = generateToken({ userId: user.id, mobileNumber: user.mobileNumber, role: user.role });
 
     await recordAuditLog({
       userId: user.id,
-      username: user.username,
+      username: user.mobileNumber,
       region: user.region,
       eventType: 'LOGIN',
       status: 'SUCCESS',
@@ -48,7 +48,13 @@ export async function login(req: Request, res: Response) {
       success: true,
       data: {
         token,
-        user: { id: user.id, username: user.username, role: user.role, status: user.status, createdAt: user.createdAt },
+        user: {
+          id: user.id,
+          mobileNumber: user.mobileNumber,
+          role: user.role,
+          status: user.status,
+          createdAt: user.createdAt,
+        },
       },
     });
   } catch (error) {
@@ -63,7 +69,7 @@ export async function logout(req: AuthenticatedRequest, res: Response) {
       const user = await prisma.user.findUnique({ where: { id: req.user.userId }, select: { region: true } });
       await recordAuditLog({
         userId: req.user.userId,
-        username: req.user.username,
+        username: req.user.mobileNumber,
         region: user?.region ?? null,
         eventType: 'LOGOUT',
         status: 'SUCCESS',
@@ -90,7 +96,13 @@ export async function validate(req: AuthenticatedRequest, res: Response) {
     return res.status(200).json({
       success: true,
       data: {
-        user: { id: user.id, username: user.username, role: user.role, status: user.status, createdAt: user.createdAt },
+        user: {
+          id: user.id,
+          mobileNumber: user.mobileNumber,
+          role: user.role,
+          status: user.status,
+          createdAt: user.createdAt,
+        },
       },
     });
   } catch (error) {

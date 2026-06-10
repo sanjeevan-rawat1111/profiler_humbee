@@ -20,11 +20,12 @@ async function runTests() {
     const res = await fetch(`${BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: 'user', password: 'user123' })
+      body: JSON.stringify({ mobileNumber: '9000000002', password: 'User1234' })
     });
     const data = await res.json();
-    if (res.status === 200 && data.token) {
-      userToken = data.token;
+    const token = data.data?.token ?? data.token;
+    if (res.status === 200 && token) {
+      userToken = token;
       console.log('✅ Test 2: Standard user login - Passed. Token generated.');
     } else {
       throw new Error(JSON.stringify(data));

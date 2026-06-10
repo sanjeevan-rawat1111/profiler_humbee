@@ -73,6 +73,7 @@ export interface AuditLogRecord {
 export interface DBUser {
   id: string;
   username: string;
+  mobileNumber: string;
   role: string;
   region: string;
   status: string;

@@ -77,10 +77,10 @@ DIRECT_URL=postgresql://postgres.PROJECT_REF:PASSWORD@aws-1-REGION.pooler.supaba
 
 Use the following seeded accounts to sign in:
 - **Standard User Account:**
-  - Username: `user`
+  - Mobile Number: `9000000002`
   - Password: `User1234`
 - **Administrator Account:**
-  - Username: `admin`
+  - Mobile Number: `9000000001`
   - Password: `Admin1234`
 
 ---

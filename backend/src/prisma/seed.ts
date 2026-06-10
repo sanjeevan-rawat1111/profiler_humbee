@@ -6,12 +6,14 @@ const prisma = new PrismaClient();
 const DEFAULT_USERS = [
   {
     username: 'admin',
+    mobileNumber: '9000000001',
     password: 'Admin1234',
     role: 'admin' as const,
     region: 'HUMBEE',
   },
   {
     username: 'user',
+    mobileNumber: '9000000002',
     password: 'User1234',
     role: 'user' as const,
     region: 'HUMBEE',
@@ -20,11 +22,14 @@ const DEFAULT_USERS = [
 
 async function ensureUser(
   username: string,
+  mobileNumber: string,
   password: string,
   role: 'admin' | 'user',
   region: string,
 ) {
-  const existing = await prisma.user.findUnique({ where: { username } });
+  const existing = await prisma.user.findFirst({
+    where: { OR: [{ username }, { mobileNumber }] },
+  });
   if (existing) {
     console.log(`- Skipped ${username} (already exists)`);
     return;
@@ -34,20 +39,21 @@ async function ensureUser(
   await prisma.user.create({
     data: {
       username,
+      mobileNumber,
       passwordHash,
       plainPassword: password,
       role,
       region,
     },
   });
-  console.log(`- Created ${role} user: ${username} (password: ${password}, region: ${region})`);
+  console.log(`- Created ${role} user: ${username} / ${mobileNumber} (password: ${password}, region: ${region})`);
 }
 
 async function main() {
   console.log('Seeding database...');
 
   for (const user of DEFAULT_USERS) {
-    await ensureUser(user.username, user.password, user.role, user.region);
+    await ensureUser(user.username, user.mobileNumber, user.password, user.role, user.region);
   }
 
   console.log('Database seed complete.');

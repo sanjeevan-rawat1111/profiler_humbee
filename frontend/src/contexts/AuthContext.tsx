@@ -3,7 +3,7 @@ import api from '../services/api';
 
 interface User {
   id: string;
-  username: string;
+  mobileNumber: string;
   role: string;
   createdAt: string;
 }
@@ -13,7 +13,7 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<{ role: string }>;
+  login: (mobileNumber: string, password: string) => Promise<{ role: string }>;
   logout: () => void;
   error: string | null;
   clearError: () => void;
@@ -58,10 +58,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [clearSession]);
 
-  const login = async (username: string, password: string): Promise<{ role: string }> => {
+  const login = async (mobileNumber: string, password: string): Promise<{ role: string }> => {
     setError(null);
-    const res = await api.post('/api/auth/login', { username, password });
-    // Support both old shape {token, user} and new shape {success, data:{token, user}}
+    const res = await api.post('/api/auth/login', { mobileNumber, password });
     const payload = res.data.data ?? res.data;
     const { token: newToken, user: newUser } = payload;
 

@@ -4,7 +4,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'humbee-super-secret-jwt-key-24h-va
 
 export interface TokenPayload {
   userId: string;
-  username: string;
+  mobileNumber: string;
   role: string;
 }
 

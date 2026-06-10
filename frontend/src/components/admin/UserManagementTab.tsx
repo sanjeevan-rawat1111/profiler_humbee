@@ -39,6 +39,7 @@ const UserManagementTab: React.FC<Props> = ({
   const [editingUser, setEditingUser] = useState<DBUser | null>(null);
   const [form, setForm] = useState({
     username: '',
+    mobileNumber: '',
     password: '',
     region: '',
     role: 'user' as 'user' | 'admin',
@@ -61,7 +62,7 @@ const UserManagementTab: React.FC<Props> = ({
 
   const openCreate = () => {
     setEditingUser(null);
-    setForm({ username: '', password: '', region: '', role: 'user', status: 'active' });
+    setForm({ username: '', mobileNumber: '', password: '', region: '', role: 'user', status: 'active' });
     setShowForm(true);
   };
 
@@ -69,6 +70,7 @@ const UserManagementTab: React.FC<Props> = ({
     setEditingUser(user);
     setForm({
       username: user.username,
+      mobileNumber: user.mobileNumber,
       password: '',
       region: user.region,
       role: user.role as 'user' | 'admin',
@@ -111,6 +113,7 @@ const UserManagementTab: React.FC<Props> = ({
       if (editingUser) {
         const payload: Record<string, string> = {
           username: form.username,
+          mobileNumber: form.mobileNumber,
           region: form.region,
           role: form.role,
           status: form.status,
@@ -228,6 +231,15 @@ const UserManagementTab: React.FC<Props> = ({
           <h4 className="text-sm font-bold text-slate-700">{editingUser ? 'Edit User' : 'New User'}</h4>
           <input type="text" placeholder="Username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className="input-style-compact w-full" required />
           <input
+            type="tel"
+            placeholder="Mobile Number (10 digits)"
+            value={form.mobileNumber}
+            onChange={(e) => setForm({ ...form, mobileNumber: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+            className="input-style-compact w-full"
+            maxLength={10}
+            required
+          />
+          <input
             type="password"
             placeholder={editingUser ? 'New password (optional)' : 'Password'}
             value={form.password}
@@ -271,6 +283,7 @@ const UserManagementTab: React.FC<Props> = ({
             <thead>
               <tr className="bg-slate-50 text-slate-500">
                 <th className="p-4 text-left">Username</th>
+                <th className="p-4 text-left">Mobile Number</th>
                 <th className="p-4 text-left">Password</th>
                 <th className="p-4 text-left">Region</th>
                 <th className="p-4 text-left">Role</th>
@@ -283,6 +296,7 @@ const UserManagementTab: React.FC<Props> = ({
               {users.map((u) => (
                 <tr key={u.id}>
                   <td className="p-4 font-bold text-slate-800">{u.username}</td>
+                  <td className="p-4 font-mono text-slate-600">{u.mobileNumber}</td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-slate-500">

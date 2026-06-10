@@ -31,7 +31,7 @@ export async function getUsers(req: Request, res: Response) {
     const [users, allUsernames] = await Promise.all([
       prisma.user.findMany({
         where: buildUserListWhere(filters),
-        select: { id: true, username: true, role: true, region: true, status: true, createdAt: true, updatedAt: true },
+        select: { id: true, username: true, mobileNumber: true, role: true, region: true, status: true, createdAt: true, updatedAt: true },
         orderBy: { createdAt: 'desc' },
       }),
       prisma.user.findMany({
@@ -53,22 +53,27 @@ export async function getUsers(req: Request, res: Response) {
 }
 
 export async function createUser(req: Request, res: Response) {
-  const { username, password, role, status, region } = req.body;
+  const { username, mobileNumber, password, role, status, region } = req.body;
   try {
-    const existing = await prisma.user.findUnique({ where: { username } });
-    if (existing) {
+    const existingUsername = await prisma.user.findUnique({ where: { username } });
+    if (existingUsername) {
       return res.status(400).json({ success: false, message: 'Username already exists' });
+    }
+    const existingMobile = await prisma.user.findUnique({ where: { mobileNumber } });
+    if (existingMobile) {
+      return res.status(400).json({ success: false, message: 'Mobile number already exists' });
     }
     const user = await prisma.user.create({
       data: {
         username,
+        mobileNumber,
         passwordHash: await hashPassword(password),
         plainPassword: password,
         role: role || 'user',
         region,
         status: status || 'active',
       },
-      select: { id: true, username: true, role: true, region: true, status: true, createdAt: true },
+      select: { id: true, username: true, mobileNumber: true, role: true, region: true, status: true, createdAt: true },
     });
     return res.status(201).json({ success: true, data: user });
   } catch (error) {
@@ -79,7 +84,7 @@ export async function createUser(req: Request, res: Response) {
 
 export async function updateUser(req: Request, res: Response) {
   const { id } = req.params;
-  const { username, password, role, status, region } = req.body;
+  const { username, mobileNumber, password, role, status, region } = req.body;
   try {
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) {
@@ -90,6 +95,11 @@ export async function updateUser(req: Request, res: Response) {
       const dup = await prisma.user.findFirst({ where: { username, id: { not: id } } });
       if (dup) return res.status(400).json({ success: false, message: 'Username already taken' });
       updateData.username = username;
+    }
+    if (mobileNumber) {
+      const dup = await prisma.user.findFirst({ where: { mobileNumber, id: { not: id } } });
+      if (dup) return res.status(400).json({ success: false, message: 'Mobile number already taken' });
+      updateData.mobileNumber = mobileNumber;
     }
     if (password) {
       updateData.passwordHash = await hashPassword(password);
@@ -102,7 +112,7 @@ export async function updateUser(req: Request, res: Response) {
     const updated = await prisma.user.update({
       where: { id },
       data: updateData,
-      select: { id: true, username: true, role: true, region: true, status: true, updatedAt: true },
+      select: { id: true, username: true, mobileNumber: true, role: true, region: true, status: true, updatedAt: true },
     });
     return res.status(200).json({ success: true, data: updated });
   } catch (error) {
@@ -158,14 +168,14 @@ export async function exportUsersCsv(req: Request, res: Response) {
   try {
     const users = await prisma.user.findMany({
       where: buildUserListWhere(filters),
-      select: { username: true, region: true, role: true, status: true, createdAt: true },
+      select: { username: true, mobileNumber: true, region: true, role: true, status: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
     return sendCsv(
       res,
       'users.csv',
-      ['Username', 'Region', 'Role', 'Status', 'Created At'],
-      users.map((u) => [u.username, u.region, u.role, u.status, u.createdAt.toISOString()])
+      ['Username', 'Mobile Number', 'Region', 'Role', 'Status', 'Created At'],
+      users.map((u) => [u.username, u.mobileNumber, u.region, u.role, u.status, u.createdAt.toISOString()])
     );
   } catch (error) {
     console.error('exportUsersCsv error:', error);
@@ -178,14 +188,14 @@ export async function exportUsersExcel(req: Request, res: Response) {
   try {
     const users = await prisma.user.findMany({
       where: buildUserListWhere(filters),
-      select: { username: true, region: true, role: true, status: true, createdAt: true },
+      select: { username: true, mobileNumber: true, region: true, role: true, status: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
     return sendExcel(
       res,
       'users.xls',
-      ['Username', 'Region', 'Role', 'Status', 'Created At'],
-      users.map((u) => [u.username, u.region, u.role, u.status, u.createdAt.toISOString()])
+      ['Username', 'Mobile Number', 'Region', 'Role', 'Status', 'Created At'],
+      users.map((u) => [u.username, u.mobileNumber, u.region, u.role, u.status, u.createdAt.toISOString()])
     );
   } catch (error) {
     console.error('exportUsersExcel error:', error);
