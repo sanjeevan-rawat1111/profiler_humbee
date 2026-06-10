@@ -49,11 +49,11 @@ export function uniqueByUser(rows: SubmissionRow[]) {
   const map = new Map<string, { region: string; keys: Set<string>; lastAt: Date }>();
   rows.forEach((row) => {
     if (!row.user) return;
-    const username = row.user.username;
-    if (!map.has(username)) {
-      map.set(username, { region: row.user.region, keys: new Set(), lastAt: row.submittedAt });
+    const mobileNumber = row.user.mobileNumber;
+    if (!map.has(mobileNumber)) {
+      map.set(mobileNumber, { region: row.user.region, keys: new Set(), lastAt: row.submittedAt });
     }
-    const entry = map.get(username)!;
+    const entry = map.get(mobileNumber)!;
     entry.keys.add(uniqueSubmissionKey(row));
     if (row.submittedAt > entry.lastAt) entry.lastAt = row.submittedAt;
   });
@@ -69,7 +69,7 @@ export function uniqueByRegion(rows: SubmissionRow[]) {
     if (!map.has(region)) map.set(region, new Set());
     map.get(region)?.add(uniqueSubmissionKey(row));
     if (!usersByRegion.has(region)) usersByRegion.set(region, new Set());
-    usersByRegion.get(region)?.add(row.user.username);
+    usersByRegion.get(region)?.add(row.user.mobileNumber);
   });
   return { submissions: map, users: usersByRegion };
 }
@@ -152,7 +152,7 @@ export function filterRowsBySelections(
   return rows.filter((row) => {
     if (!row.user) return false;
     if (regions.length && !regions.includes(row.user.region)) return false;
-    if (users.length && !users.includes(row.user.username)) return false;
+    if (users.length && !users.includes(row.user.mobileNumber)) return false;
     return true;
   });
 }
@@ -162,11 +162,11 @@ export function trendByUser(rows: SubmissionRow[], range: { gte: Date; lte: Date
   rowsInRange(rows, range).forEach((row) => {
     if (!row.user) return;
     const day = toDateKey(row.submittedAt);
-    const username = row.user.username;
+    const mobileNumber = row.user.mobileNumber;
     if (!byDayUser.has(day)) byDayUser.set(day, new Map());
     const dayMap = byDayUser.get(day)!;
-    if (!dayMap.has(username)) dayMap.set(username, new Set());
-    dayMap.get(username)?.add(uniqueSubmissionKey(row));
+    if (!dayMap.has(mobileNumber)) dayMap.set(mobileNumber, new Set());
+    dayMap.get(mobileNumber)?.add(uniqueSubmissionKey(row));
   });
 
   const cursor = new Date(range.gte);
@@ -176,13 +176,13 @@ export function trendByUser(rows: SubmissionRow[], range: { gte: Date; lte: Date
     cursor.setDate(cursor.getDate() + 1);
   }
 
-  const usernames = [...new Set(rows.map((r) => r.user?.username).filter(Boolean))] as string[];
+  const mobileNumbers = [...new Set(rows.map((r) => r.user?.mobileNumber).filter(Boolean))] as string[];
   return Array.from(byDayUser.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, userMap]) => {
       const point: Record<string, string | number> = { date };
-      usernames.forEach((username) => {
-        point[username] = userMap.get(username)?.size ?? 0;
+      mobileNumbers.forEach((mobileNumber) => {
+        point[mobileNumber] = userMap.get(mobileNumber)?.size ?? 0;
       });
       return point;
     });
@@ -198,7 +198,7 @@ export function contributionDistribution(items: { name: string; uniqueCount: num
 }
 
 export function countActiveUsers(rows: SubmissionRow[]) {
-  return new Set(rows.map((r) => r.user?.username).filter(Boolean)).size;
+  return new Set(rows.map((r) => r.user?.mobileNumber).filter(Boolean)).size;
 }
 
 export function countActiveRegions(rows: SubmissionRow[]) {
@@ -215,7 +215,7 @@ export function leaderboardFromRows(rows: SubmissionRow[], mode: 'region' | 'use
   }
   const byUser = uniqueByUser(rows);
   return Array.from(byUser.entries())
-    .map(([username, data]) => ({ name: username, totalSubmissions: data.keys.size }))
+    .map(([mobileNumber, data]) => ({ name: mobileNumber, totalSubmissions: data.keys.size }))
     .sort((a, b) => b.totalSubmissions - a.totalSubmissions)
     .map((item, index) => ({ rank: index + 1, ...item }));
 }

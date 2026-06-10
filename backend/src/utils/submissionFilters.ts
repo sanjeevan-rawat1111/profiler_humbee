@@ -4,7 +4,7 @@ export type SubmissionRow = {
   mobileNumber: string;
   submittedAt: Date;
   userId: string;
-  user: { username: string; role: string; region: string } | null;
+  user: { mobileNumber: string; role: string; region: string } | null;
 };
 
 export function isAnalyticsUser(row: SubmissionRow) {
@@ -29,7 +29,7 @@ export function toHourKey(date: Date) {
 
 export function parseFilterQuery(query: Record<string, unknown>) {
   const search = String(query.search || '').trim();
-  const user = String(query.user || query.username || '').trim();
+  const user = String(query.user || '').trim();
   const region = String(query.region || '').trim();
   const sapCode = String(query.sapCode || '').trim();
   const mobileNumber = String(query.mobileNumber || query.mobile || '').trim();
@@ -101,7 +101,7 @@ export function buildSubmissionWhere(filters: ReturnType<typeof parseFilterQuery
   if (filters.mobileNumber) where.mobileNumber = { contains: filters.mobileNumber };
   if (filters.user || filters.region) {
     const userFilter: Record<string, unknown> = {};
-    if (filters.user) userFilter.username = { contains: filters.user };
+    if (filters.user) userFilter.mobileNumber = { contains: filters.user };
     if (filters.region) userFilter.region = { contains: filters.region };
     where.user = userFilter;
   }
@@ -113,7 +113,7 @@ export function buildSubmissionWhere(filters: ReturnType<typeof parseFilterQuery
     where.OR = [
       { sapCode: { contains: filters.search } },
       { mobileNumber: { contains: filters.search } },
-      { user: { username: { contains: filters.search } } },
+      { user: { mobileNumber: { contains: filters.search } } },
       { user: { region: { contains: filters.search } } },
     ];
   }
@@ -131,7 +131,7 @@ export async function fetchFilteredSubmissions(prisma: any, filters: ReturnType<
       mobileNumber: true,
       submittedAt: true,
       userId: true,
-      user: { select: { username: true, role: true, region: true } },
+      user: { select: { mobileNumber: true, role: true, region: true } },
     },
     orderBy: { submittedAt: 'desc' },
   }) as Promise<SubmissionRow[]>;
@@ -143,6 +143,6 @@ export function countUniqueSubmissions(rows: Pick<SubmissionRow, 'sapCode' | 'mo
 
 export function daysInRange(range?: { gte: Date; lte: Date }) {
   if (!range) return 1;
-  const ms = range.lte.getTime() - range.gte.getTime();
-  return Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+  const diff = range.lte.getTime() - range.gte.getTime();
+  return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }

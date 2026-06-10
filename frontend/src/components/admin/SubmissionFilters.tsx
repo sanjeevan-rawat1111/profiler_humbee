@@ -35,7 +35,7 @@ const SubmissionFiltersBar: React.FC<Props> = ({
         <Search className="input-wrapper-icon w-4 h-4 text-slate-400" />
         <input
           type="text"
-          placeholder="Search by username, region, SAP code, mobile number..."
+          placeholder="Search by mobile number, region, SAP code..."
           value={filters.search}
           onChange={(e) => update('search', e.target.value)}
           className="input-style-compact"
@@ -49,8 +49,8 @@ const SubmissionFiltersBar: React.FC<Props> = ({
           className="input-style-compact"
         >
           <option value="">All Users</option>
-          {users.map((username) => (
-            <option key={username} value={username}>{username}</option>
+          {users.map((mobile) => (
+            <option key={mobile} value={mobile}>{mobile}</option>
           ))}
         </select>
         <input

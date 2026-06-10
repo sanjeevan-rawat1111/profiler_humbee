@@ -19,7 +19,7 @@ function uniqueByUser(rows: SubmissionRow[]) {
   const map = new Map<string, Set<string>>();
   rows.forEach((row) => {
     if (!isAnalyticsUser(row)) return;
-    const key = row.user!.username;
+    const key = row.user!.mobileNumber;
     if (!map.has(key)) map.set(key, new Set());
     map.get(key)?.add(uniqueSubmissionKey(row));
   });
@@ -64,10 +64,10 @@ export async function getKpiDashboard(req: Request, res: Response) {
 
     const userUniqueMap = uniqueByUser(periodRows);
     const userPerformance = Array.from(userUniqueMap.entries())
-      .map(([username, set]) => ({ username, uniqueCount: set.size }))
+      .map(([mobileNumber, set]) => ({ mobileNumber, uniqueCount: set.size }))
       .sort((a, b) => {
         const diff = a.uniqueCount - b.uniqueCount;
-        return filters.rankingSort === 'asc' ? diff || a.username.localeCompare(b.username) : -diff || a.username.localeCompare(b.username);
+        return filters.rankingSort === 'asc' ? diff || a.mobileNumber.localeCompare(b.mobileNumber) : -diff || a.mobileNumber.localeCompare(b.mobileNumber);
       });
 
     const topPerformer = userPerformance[0] ?? null;
@@ -78,7 +78,7 @@ export async function getKpiDashboard(req: Request, res: Response) {
 
     const totalUniqueAll = countUniqueSubmissions(periodRows);
     const contribution = userPerformance.map((item) => ({
-      username: item.username,
+      mobileNumber: item.mobileNumber,
       uniqueCount: item.uniqueCount,
       percentage: totalUniqueAll > 0 ? Math.round((item.uniqueCount / totalUniqueAll) * 1000) / 10 : 0,
     }));
@@ -98,7 +98,7 @@ export async function getKpiDashboard(req: Request, res: Response) {
     const userFirstLast = new Map<string, { first: Date; last: Date }>();
     periodRows.forEach((row) => {
       if (!row.user) return;
-      const name = row.user.username;
+      const name = row.user.mobileNumber;
       const existing = userFirstLast.get(name);
       if (!existing) {
         userFirstLast.set(name, { first: row.submittedAt, last: row.submittedAt });
@@ -109,10 +109,10 @@ export async function getKpiDashboard(req: Request, res: Response) {
     });
 
     const topPerformingUsers = userPerformance.map((item, index) => {
-      const bounds = userFirstLast.get(item.username);
+      const bounds = userFirstLast.get(item.mobileNumber);
       return {
         rank: index + 1,
-        username: item.username,
+        mobileNumber: item.mobileNumber,
         uniqueSubmissions: item.uniqueCount,
         firstSubmission: bounds?.first.toISOString() ?? null,
         lastSubmission: bounds?.last.toISOString() ?? null,
@@ -121,16 +121,16 @@ export async function getKpiDashboard(req: Request, res: Response) {
 
     const recentActivity = allRows.slice(0, 20).map((row) => ({
       timestamp: row.submittedAt.toISOString(),
-      username: row.user?.username ?? 'System',
+      userMobileNumber: row.user?.mobileNumber ?? 'System',
       region: row.user?.region ?? '',
       sapCode: row.sapCode,
-      mobileNumber: row.mobileNumber,
+      customerMobileNumber: row.mobileNumber,
     }));
 
     const allUsers = await prisma.user.findMany({
       where: { role: 'user' },
-      select: { username: true, region: true },
-      orderBy: { username: 'asc' },
+      select: { mobileNumber: true, region: true },
+      orderBy: { mobileNumber: 'asc' },
     });
 
     return res.status(200).json({
@@ -151,7 +151,7 @@ export async function getKpiDashboard(req: Request, res: Response) {
         hourlyActivity,
         topPerformingUsers,
         recentActivity,
-        users: allUsers.map((u) => u.username),
+        users: allUsers.map((u) => u.mobileNumber),
         regions: [...new Set(allUsers.map((u) => u.region))].sort(),
       },
     });
@@ -167,10 +167,10 @@ export async function exportKpiCsv(req: Request, res: Response) {
     const allRows = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters));
     const userMap = uniqueByUser(allRows);
     const rows = Array.from(userMap.entries())
-      .map(([username, set]) => [username, set.size])
+      .map(([mobileNumber, set]) => [mobileNumber, set.size])
       .sort((a, b) => Number(b[1]) - Number(a[1]));
 
-    return sendCsv(res, 'kpi-dashboard.csv', ['User', 'Unique Submissions'], rows);
+    return sendCsv(res, 'kpi-dashboard.csv', ['Mobile Number', 'Unique Submissions'], rows);
   } catch (error) {
     console.error('exportKpiCsv error:', error);
     return res.status(500).json({ success: false, message: 'Internal server error' });
@@ -183,10 +183,10 @@ export async function exportKpiExcel(req: Request, res: Response) {
     const allRows = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters));
     const userMap = uniqueByUser(allRows);
     const rows = Array.from(userMap.entries())
-      .map(([username, set]) => [username, set.size])
+      .map(([mobileNumber, set]) => [mobileNumber, set.size])
       .sort((a, b) => Number(b[1]) - Number(a[1]));
 
-    return sendExcel(res, 'kpi-dashboard.xls', ['User', 'Unique Submissions'], rows);
+    return sendExcel(res, 'kpi-dashboard.xls', ['Mobile Number', 'Unique Submissions'], rows);
   } catch (error) {
     console.error('exportKpiExcel error:', error);
     return res.status(500).json({ success: false, message: 'Internal server error' });

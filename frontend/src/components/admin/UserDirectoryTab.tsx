@@ -17,7 +17,7 @@ interface Props {
 }
 
 const sortableColumns = [
-  { key: 'username', label: 'User' },
+  { key: 'userMobileNumber', label: 'Mobile Number' },
   { key: 'region', label: 'Region' },
   { key: 'sapCode', label: 'SAP Code' },
   { key: 'mobileNumber', label: 'Mobile Number' },
@@ -89,7 +89,7 @@ const UserDirectoryTab: React.FC<Props> = ({
                     onClick={() => openDetails(record)}
                     className="hover:bg-amber-50/40 transition-colors cursor-pointer"
                   >
-                    <td className="p-4 font-bold text-slate-800">{record.username}</td>
+                    <td className="p-4 font-mono font-bold text-slate-800">{record.userMobileNumber}</td>
                     <td className="p-4 text-slate-600">{record.region}</td>
                     <td className="p-4 font-mono text-humbee-600">{record.sapCode}</td>
                     <td className="p-4 font-mono">{record.mobileNumber}</td>
@@ -130,7 +130,7 @@ const UserDirectoryTab: React.FC<Props> = ({
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h3 className="text-lg font-bold text-slate-800">User Submission Details</h3>
-                <p className="text-sm text-slate-500">{selectedUser.username}</p>
+                <p className="text-sm text-slate-500 font-mono">{selectedUser.userMobileNumber}</p>
               </div>
               <button onClick={() => setSelectedUser(null)} className="p-2 rounded-lg hover:bg-slate-100 cursor-pointer">
                 <X className="w-4 h-4" />

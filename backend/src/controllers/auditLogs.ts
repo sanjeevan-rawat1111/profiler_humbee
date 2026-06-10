@@ -87,7 +87,7 @@ export async function exportAuditLogsCsv(req: Request, res: Response) {
     return sendCsv(
       res,
       'audit-logs.csv',
-      ['User', 'Region', 'Timestamp', 'Event Type', 'Status', 'Reason'],
+      ['Mobile Number', 'Region', 'Timestamp', 'Event Type', 'Status', 'Reason'],
       logs.map((log) => [log.username, log.region ?? '', log.createdAt.toISOString(), log.eventType, log.status, log.reason ?? ''])
     );
   } catch (error) {
@@ -102,7 +102,7 @@ export async function exportAuditLogsExcel(req: Request, res: Response) {
     return sendExcel(
       res,
       'audit-logs.xls',
-      ['User', 'Region', 'Timestamp', 'Event Type', 'Status', 'Reason'],
+      ['Mobile Number', 'Region', 'Timestamp', 'Event Type', 'Status', 'Reason'],
       logs.map((log) => [log.username, log.region ?? '', log.createdAt.toISOString(), log.eventType, log.status, log.reason ?? ''])
     );
   } catch (error) {

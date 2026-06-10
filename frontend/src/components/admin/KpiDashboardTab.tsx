@@ -56,7 +56,7 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
         <KpiCard
           icon={<Trophy className="w-4 h-4" />}
           label="Top Performer"
-          value={summary.topPerformer ? `${summary.topPerformer.username} (${summary.topPerformer.uniqueCount})` : '—'}
+          value={summary.topPerformer ? `${summary.topPerformer.mobileNumber} (${summary.topPerformer.uniqueCount})` : '—'}
           accent="bg-amber-50 text-amber-700"
         />
         <KpiCard icon={<Calendar className="w-4 h-4" />} label="Today's Submissions" value={summary.todaysSubmissions} />
@@ -87,7 +87,7 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data.userPerformance}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="username" tick={{ fontSize: 10 }} />
+              <XAxis dataKey="mobileNumber" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} />
               <Tooltip />
               <Bar dataKey="uniqueCount" fill="#349688" radius={[4, 4, 0, 0]} />
@@ -96,7 +96,7 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data.userPerformance}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="username" tick={{ fontSize: 10 }} />
+              <XAxis dataKey="mobileNumber" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} />
               <Tooltip />
               <Line type="monotone" dataKey="uniqueCount" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
@@ -135,7 +135,7 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={data.contribution} dataKey="uniqueCount" nameKey="username" cx="50%" cy="50%" innerRadius={50} outerRadius={80}>
+                <Pie data={data.contribution} dataKey="uniqueCount" nameKey="mobileNumber" cx="50%" cy="50%" innerRadius={50} outerRadius={80}>
                   {data.contribution.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Tooltip />
@@ -169,7 +169,7 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
           <thead>
             <tr className="bg-slate-50 text-slate-500">
               <th className="p-4 text-left">Rank</th>
-              <th className="p-4 text-left">User</th>
+              <th className="p-4 text-left">Mobile Number</th>
               <th className="p-4 text-left">Unique Submissions</th>
               <th className="p-4 text-left">First Submission</th>
               <th className="p-4 text-left">Last Submission</th>
@@ -177,9 +177,9 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
           </thead>
           <tbody className="divide-y divide-slate-100">
             {data.topPerformingUsers.map((row) => (
-              <tr key={row.username}>
+              <tr key={row.mobileNumber}>
                 <td className="p-4 font-bold text-slate-400">#{row.rank}</td>
-                <td className="p-4 font-bold text-slate-800">{row.username}</td>
+                <td className="p-4 font-mono font-bold text-slate-800">{row.mobileNumber}</td>
                 <td className="p-4 font-mono text-humbee-700">{row.uniqueSubmissions}</td>
                 <td className="p-4 text-slate-400">{row.firstSubmission ? formatDateTime(row.firstSubmission) : '—'}</td>
                 <td className="p-4 text-amber-700">{row.lastSubmission ? formatDateTime(row.lastSubmission) : '—'}</td>
@@ -197,7 +197,7 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
           <thead>
             <tr className="bg-slate-50 text-slate-500">
               <th className="p-4 text-left">Timestamp</th>
-              <th className="p-4 text-left">User</th>
+              <th className="p-4 text-left">Mobile Number</th>
               <th className="p-4 text-left">SAP Code</th>
               <th className="p-4 text-left">Mobile Number</th>
             </tr>
@@ -206,9 +206,9 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
             {data.recentActivity.map((row, i) => (
               <tr key={`${row.timestamp}-${i}`}>
                 <td className="p-4">{formatDateTime(row.timestamp)}</td>
-                <td className="p-4 font-semibold">{row.username}</td>
+                <td className="p-4 font-mono font-semibold">{row.userMobileNumber}</td>
                 <td className="p-4 font-mono text-humbee-600">{row.sapCode}</td>
-                <td className="p-4 font-mono">{row.mobileNumber}</td>
+                <td className="p-4 font-mono">{row.customerMobileNumber}</td>
               </tr>
             ))}
           </tbody>

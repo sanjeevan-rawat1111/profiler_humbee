@@ -71,8 +71,8 @@ const AnalyticsDashboardTab: React.FC = () => {
   const availableUsers = useMemo(() => {
     if (!data) return [];
     const { users } = data.filterOptions;
-    if (!filters.regions.length) return users.map((u) => u.username);
-    return users.filter((u) => filters.regions.includes(u.region)).map((u) => u.username);
+    if (!filters.regions.length) return users.map((u) => u.mobileNumber);
+    return users.filter((u) => filters.regions.includes(u.region)).map((u) => u.mobileNumber);
   }, [data, filters.regions]);
 
   useEffect(() => {
@@ -98,13 +98,13 @@ const AnalyticsDashboardTab: React.FC = () => {
   );
 
   const userListItems = useMemo(
-    () => (data?.users.topChart ?? []).map((item) => ({ name: item.username, count: item.uniqueCount })),
+    () => (data?.users.topChart ?? []).map((item) => ({ name: item.mobileNumber, count: item.uniqueCount })),
     [data],
   );
 
   const inactiveListItems = useMemo(
     () => (data?.inactiveUsers ?? []).map((item) => ({
-      name: item.username,
+      name: item.mobileNumber,
       count: 0,
       region: item.region,
       lastSubmission: item.lastSubmission,
@@ -183,8 +183,8 @@ const AnalyticsDashboardTab: React.FC = () => {
               disabled={!data && loading}
             />
             <SearchableMultiSelect
-              label="Users"
-              placeholder="Type user name..."
+              label="Mobile Number"
+              placeholder="Search mobile number..."
               options={availableUsers}
               selected={filters.users}
               onChange={(users) => setFilters((f) => ({ ...f, users }))}
@@ -242,7 +242,7 @@ const AnalyticsDashboardTab: React.FC = () => {
               <ChartPanel title="Top Users Ranking" className="min-h-[420px]">
                 <ScrollableBarChart
                   data={data.topPerformers.users.map((item) => ({
-                    label: item.username,
+                    label: item.mobileNumber,
                     value: item.totalSubmissions,
                   }))}
                   color="#8b5cf6"
@@ -296,7 +296,7 @@ const AnalyticsDashboardTab: React.FC = () => {
               <RankedListPanel
                 title="Top Users by Submission Count"
                 items={userListItems}
-                nameLabel="User Name"
+                nameLabel="Mobile Number"
                 countLabel="Submissions"
               />
               <ChartPanel title="User Activity Distribution">
@@ -305,7 +305,7 @@ const AnalyticsDashboardTab: React.FC = () => {
                     <Pie
                       data={data.users.activityDistribution.slice(0, 10)}
                       dataKey="uniqueCount"
-                      nameKey="username"
+                      nameKey="mobileNumber"
                       cx="50%"
                       cy="50%"
                       innerRadius={55}
@@ -319,7 +319,7 @@ const AnalyticsDashboardTab: React.FC = () => {
                     <Tooltip
                       formatter={(value, _name, props) => [
                         `${formatCount(value)} (${formatCount((props?.payload as { percentage?: number })?.percentage)}%)`,
-                        (props?.payload as { username?: string })?.username ?? '',
+                        (props?.payload as { mobileNumber?: string })?.mobileNumber ?? '',
                       ]}
                     />
                     <Legend wrapperStyle={{ fontSize: 10 }} />
@@ -335,7 +335,7 @@ const AnalyticsDashboardTab: React.FC = () => {
               title="Inactive Users List"
               items={[]}
               extendedItems={inactiveListItems}
-              nameLabel="User Name"
+              nameLabel="Mobile Number"
               showLastSubmission
               showRegionColumn
               highlightTop

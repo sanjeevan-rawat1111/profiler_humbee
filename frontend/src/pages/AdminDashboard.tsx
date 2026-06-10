@@ -35,7 +35,7 @@ const AdminDashboard: React.FC = () => {
   const [loadingDirectory, setLoadingDirectory] = useState(false);
 
   const [users, setUsers] = useState<DBUser[]>([]);
-  const [userFilterOptions, setUserFilterOptions] = useState<string[]>([]);
+  const [mobileNumberFilterOptions, setMobileNumberFilterOptions] = useState<string[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [userMgmtFilters, setUserMgmtFilters] = useState<UserManagementFilters>(defaultUserManagementFilters);
 
@@ -72,10 +72,10 @@ const AdminDashboard: React.FC = () => {
       const data = res.data.data ?? res.data;
       if (Array.isArray(data)) {
         setUsers(data);
-        setUserFilterOptions(data.map((user: DBUser) => user.username));
+        setMobileNumberFilterOptions(data.map((user: DBUser) => user.mobileNumber));
       } else {
         setUsers(data.users || []);
-        setUserFilterOptions(data.filterOptions?.usernames || []);
+        setMobileNumberFilterOptions(data.filterOptions?.mobileNumbers || []);
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch users');
@@ -142,9 +142,9 @@ const AdminDashboard: React.FC = () => {
     if (mainTab === 'audit') fetchAuditLogs();
   }, [auditPage]);
 
-  const userOptions = userFilterOptions.length > 0
-    ? userFilterOptions
-    : users.filter((u) => u.role === 'user').map((u) => u.username);
+  const userOptions = mobileNumberFilterOptions.length > 0
+    ? mobileNumberFilterOptions
+    : users.filter((u) => u.role === 'user').map((u) => u.mobileNumber);
 
   return (
     <AdminLayout
@@ -216,7 +216,7 @@ const AdminDashboard: React.FC = () => {
       {mainTab === 'users' && (
         <UserManagementTab
           users={users}
-          userOptions={userFilterOptions}
+          mobileNumberOptions={mobileNumberFilterOptions}
           loading={loadingUsers}
           filters={userMgmtFilters}
           onFiltersChange={setUserMgmtFilters}

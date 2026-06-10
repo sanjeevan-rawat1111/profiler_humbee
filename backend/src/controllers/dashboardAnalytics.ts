@@ -43,8 +43,8 @@ async function buildFilterOptions(allRows: ReturnType<typeof prepareAnalyticsRow
 
   const dbUsers = await prisma.user.findMany({
     where: userWhere,
-    select: { username: true, region: true },
-    orderBy: { username: 'asc' },
+    select: { mobileNumber: true, region: true },
+    orderBy: { mobileNumber: 'asc' },
   });
 
   dbUsers.forEach((user) => {
@@ -53,7 +53,7 @@ async function buildFilterOptions(allRows: ReturnType<typeof prepareAnalyticsRow
 
   return {
     regions: [...regionSet].sort(),
-    users: dbUsers.map((user) => ({ username: user.username, region: user.region })),
+    users: dbUsers.map((user) => ({ mobileNumber: user.mobileNumber, region: user.region })),
   };
 }
 
@@ -65,31 +65,31 @@ async function buildInactiveUsers(
 ) {
   const userWhere: Record<string, unknown> = { role: 'user' };
   if (regions.length) userWhere.region = { in: regions };
-  if (users.length) userWhere.username = { in: users };
+  if (users.length) userWhere.mobileNumber = { in: users };
 
   const scopedUsers = await prisma.user.findMany({
     where: userWhere,
-    select: { username: true, region: true },
+    select: { mobileNumber: true, region: true },
   });
 
-  const activeUsernames = new Set(
-    rangeRows.map((row) => row.user?.username).filter(Boolean) as string[],
+  const activeMobileNumbers = new Set(
+    rangeRows.map((row) => row.user?.mobileNumber).filter(Boolean) as string[],
   );
 
   const lifetimeByUser = uniqueByUser(filterRowsBySelections(allRows, regions, users));
 
   const inactiveList = scopedUsers
-    .filter((user) => !activeUsernames.has(user.username))
+    .filter((user) => !activeMobileNumbers.has(user.mobileNumber))
     .map((user) => {
-      const lifetime = lifetimeByUser.get(user.username);
+      const lifetime = lifetimeByUser.get(user.mobileNumber);
       return {
-        username: user.username,
+        mobileNumber: user.mobileNumber,
         region: user.region,
         lastSubmission: lifetime?.lastAt?.toISOString() ?? null,
       };
     })
     .sort((a, b) => {
-      if (!a.lastSubmission && !b.lastSubmission) return a.username.localeCompare(b.username);
+      if (!a.lastSubmission && !b.lastSubmission) return a.mobileNumber.localeCompare(b.mobileNumber);
       if (!a.lastSubmission) return -1;
       if (!b.lastSubmission) return 1;
       return new Date(a.lastSubmission).getTime() - new Date(b.lastSubmission).getTime();
@@ -127,13 +127,13 @@ export async function getUnifiedDashboard(req: Request, res: Response) {
     }));
 
     const userTopChart = Array.from(byUser.entries())
-      .map(([username, data]) => ({ username, uniqueCount: data.keys.size }))
+      .map(([mobileNumber, data]) => ({ mobileNumber, uniqueCount: data.keys.size }))
       .sort((a, b) => b.uniqueCount - a.uniqueCount);
 
     const userActivityDistribution = contributionDistribution(
-      userTopChart.map((item) => ({ name: item.username, uniqueCount: item.uniqueCount })),
+      userTopChart.map((item) => ({ name: item.mobileNumber, uniqueCount: item.uniqueCount })),
     ).map((item) => ({
-      username: item.name,
+      mobileNumber: item.name,
       uniqueCount: item.uniqueCount,
       percentage: Math.round(item.percentage),
     }));
@@ -146,7 +146,7 @@ export async function getUnifiedDashboard(req: Request, res: Response) {
 
     const userLeaderboard = leaderboardFromRows(rangeRows, 'user').map((item) => ({
       rank: item.rank,
-      username: item.name,
+      mobileNumber: item.name,
       totalSubmissions: item.totalSubmissions,
     }));
 

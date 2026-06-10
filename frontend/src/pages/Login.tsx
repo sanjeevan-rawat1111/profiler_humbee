@@ -20,9 +20,9 @@ const Login: React.FC = () => {
   const validate = () => {
     const errs: { mobileNumber?: string; password?: string } = {};
     if (!mobileNumber.trim()) {
-      errs.mobileNumber = 'Mobile Number is required';
+      errs.mobileNumber = 'Mobile Number is required.';
     } else if (!MOBILE_REGEX.test(mobileNumber.trim())) {
-      errs.mobileNumber = 'Enter a valid 10-digit mobile number';
+      errs.mobileNumber = 'Please enter a valid 10-digit Mobile Number.';
     }
     if (!password) {
       errs.password = 'Password is required';

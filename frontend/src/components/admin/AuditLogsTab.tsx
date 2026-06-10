@@ -43,7 +43,7 @@ const AuditLogsTab: React.FC<Props> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <input
             type="text"
-            placeholder="User"
+            placeholder="Mobile Number"
             value={filters.user}
             onChange={(e) => update('user', e.target.value)}
             className="input-style-compact"
@@ -98,7 +98,7 @@ const AuditLogsTab: React.FC<Props> = ({
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-slate-50 text-slate-500">
-                <th className="p-4 text-left">User</th>
+                <th className="p-4 text-left">Mobile Number</th>
                 <th className="p-4 text-left">Region</th>
                 <th className="p-4 text-left">Timestamp</th>
                 <th className="p-4 text-left">Event Type</th>

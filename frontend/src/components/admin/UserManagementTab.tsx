@@ -7,10 +7,12 @@ import { defaultUserManagementFilters } from '../../types/admin';
 import { formatDateTime } from '../../utils/adminApi';
 
 const STATUS_OPTIONS = ['Active', 'Inactive'];
+const ROLE_OPTIONS = ['User', 'Admin'];
+const MOBILE_REGEX = /^[0-9]{10}$/;
 
 interface Props {
   users: DBUser[];
-  userOptions: string[];
+  mobileNumberOptions: string[];
   loading: boolean;
   filters: UserManagementFilters;
   onFiltersChange: (filters: UserManagementFilters) => void;
@@ -24,7 +26,7 @@ interface Props {
 
 const UserManagementTab: React.FC<Props> = ({
   users,
-  userOptions,
+  mobileNumberOptions,
   loading,
   filters,
   onFiltersChange,
@@ -38,13 +40,13 @@ const UserManagementTab: React.FC<Props> = ({
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<DBUser | null>(null);
   const [form, setForm] = useState({
-    username: '',
     mobileNumber: '',
     password: '',
     region: '',
     role: 'user' as 'user' | 'admin',
     status: 'active' as 'active' | 'inactive',
   });
+  const [fieldErrors, setFieldErrors] = useState<{ mobileNumber?: string }>({});
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [passwordCache, setPasswordCache] = useState<Record<string, string>>({});
 
@@ -62,21 +64,32 @@ const UserManagementTab: React.FC<Props> = ({
 
   const openCreate = () => {
     setEditingUser(null);
-    setForm({ username: '', mobileNumber: '', password: '', region: '', role: 'user', status: 'active' });
+    setForm({ mobileNumber: '', password: '', region: '', role: 'user', status: 'active' });
+    setFieldErrors({});
     setShowForm(true);
   };
 
   const openEdit = (user: DBUser) => {
     setEditingUser(user);
     setForm({
-      username: user.username,
       mobileNumber: user.mobileNumber,
       password: '',
       region: user.region,
       role: user.role as 'user' | 'admin',
       status: user.status as 'active' | 'inactive',
     });
+    setFieldErrors({});
     setShowForm(true);
+  };
+
+  const validateForm = () => {
+    const errs: { mobileNumber?: string } = {};
+    if (!form.mobileNumber.trim()) {
+      errs.mobileNumber = 'Mobile Number is required.';
+    } else if (!MOBILE_REGEX.test(form.mobileNumber.trim())) {
+      errs.mobileNumber = 'Please enter a valid 10-digit Mobile Number.';
+    }
+    return errs;
   };
 
   const togglePasswordVisibility = async (userId: string) => {
@@ -109,10 +122,14 @@ const UserManagementTab: React.FC<Props> = ({
     e.preventDefault();
     setError(null);
     setSuccess(null);
+
+    const errs = validateForm();
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
     try {
       if (editingUser) {
         const payload: Record<string, string> = {
-          username: form.username,
           mobileNumber: form.mobileNumber,
           region: form.region,
           role: form.role,
@@ -158,7 +175,7 @@ const UserManagementTab: React.FC<Props> = ({
     }
   };
 
-  const hasActiveFilters = filters.region || filters.users.length > 0 || filters.statuses.length > 0;
+  const hasActiveFilters = filters.region || filters.mobileNumbers.length > 0 || filters.role || filters.statuses.length > 0;
 
   return (
     <div className="space-y-6">
@@ -183,11 +200,11 @@ const UserManagementTab: React.FC<Props> = ({
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4">
         <div className="flex flex-col lg:flex-row gap-4">
           <SearchableMultiSelect
-            label="Users"
-            placeholder="Type user name..."
-            options={userOptions}
-            selected={filters.users}
-            onChange={(users) => updateFilters({ users })}
+            label="Mobile Number"
+            placeholder="Search mobile number..."
+            options={mobileNumberOptions}
+            selected={filters.mobileNumbers}
+            onChange={(mobileNumbers) => updateFilters({ mobileNumbers })}
           />
           <SearchableMultiSelect
             label="Status"
@@ -198,6 +215,21 @@ const UserManagementTab: React.FC<Props> = ({
               statuses: statuses.map((status) => status.toLowerCase()),
             })}
           />
+          <div className="min-w-[180px] flex-1">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              Role
+            </label>
+            <select
+              value={filters.role}
+              onChange={(e) => updateFilters({ role: e.target.value })}
+              className="input-style-compact w-full min-h-[42px] rounded-xl"
+            >
+              <option value="">All Roles</option>
+              {ROLE_OPTIONS.map((role) => (
+                <option key={role} value={role.toLowerCase()}>{role}</option>
+              ))}
+            </select>
+          </div>
           <div className="min-w-[220px] flex-1">
             <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
               Region
@@ -229,16 +261,23 @@ const UserManagementTab: React.FC<Props> = ({
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm max-w-lg space-y-4">
           <h4 className="text-sm font-bold text-slate-700">{editingUser ? 'Edit User' : 'New User'}</h4>
-          <input type="text" placeholder="Username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className="input-style-compact w-full" required />
-          <input
-            type="tel"
-            placeholder="Mobile Number (10 digits)"
-            value={form.mobileNumber}
-            onChange={(e) => setForm({ ...form, mobileNumber: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-            className="input-style-compact w-full"
-            maxLength={10}
-            required
-          />
+          <div>
+            <input
+              type="tel"
+              placeholder="Mobile Number (10 digits)"
+              value={form.mobileNumber}
+              onChange={(e) => {
+                setForm({ ...form, mobileNumber: e.target.value.replace(/\D/g, '').slice(0, 10) });
+                setFieldErrors((p) => ({ ...p, mobileNumber: undefined }));
+              }}
+              className={`input-style-compact w-full ${fieldErrors.mobileNumber ? 'border-red-400' : ''}`}
+              maxLength={10}
+              required
+            />
+            {fieldErrors.mobileNumber && (
+              <p className="text-xs text-red-600 mt-1">{fieldErrors.mobileNumber}</p>
+            )}
+          </div>
           <input
             type="password"
             placeholder={editingUser ? 'New password (optional)' : 'Password'}
@@ -282,7 +321,6 @@ const UserManagementTab: React.FC<Props> = ({
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-slate-50 text-slate-500">
-                <th className="p-4 text-left">Username</th>
                 <th className="p-4 text-left">Mobile Number</th>
                 <th className="p-4 text-left">Password</th>
                 <th className="p-4 text-left">Region</th>
@@ -295,8 +333,7 @@ const UserManagementTab: React.FC<Props> = ({
             <tbody className="divide-y divide-slate-100">
               {users.map((u) => (
                 <tr key={u.id}>
-                  <td className="p-4 font-bold text-slate-800">{u.username}</td>
-                  <td className="p-4 font-mono text-slate-600">{u.mobileNumber}</td>
+                  <td className="p-4 font-mono font-bold text-slate-800">{u.mobileNumber}</td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-slate-500">

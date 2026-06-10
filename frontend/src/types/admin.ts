@@ -13,7 +13,7 @@ export interface SubmissionFilters {
 
 export interface DirectoryRecord {
   userId: string;
-  username: string;
+  userMobileNumber: string;
   region: string;
   sapCode: string;
   mobileNumber: string;
@@ -32,29 +32,29 @@ export interface SubmissionDetail {
 export interface KpiDashboardData {
   lastUpdated: string;
   summary: {
-    topPerformer: { username: string; uniqueCount: number } | null;
+    topPerformer: { mobileNumber: string; uniqueCount: number } | null;
     todaysSubmissions: number;
     totalSubmissions: number;
     activeUsers: number;
     avgSubmissionsPerDay: number;
     lastActivity: string | null;
   };
-  userPerformance: { username: string; uniqueCount: number }[];
+  userPerformance: { mobileNumber: string; uniqueCount: number }[];
   trend: { date: string; uniqueCount: number }[];
-  contribution: { username: string; uniqueCount: number; percentage: number }[];
+  contribution: { mobileNumber: string; uniqueCount: number; percentage: number }[];
   hourlyActivity: { hour: string; uniqueCount: number }[];
   topPerformingUsers: {
     rank: number;
-    username: string;
+    mobileNumber: string;
     uniqueSubmissions: number;
     firstSubmission: string | null;
     lastSubmission: string | null;
   }[];
   recentActivity: {
     timestamp: string;
-    username: string;
+    userMobileNumber: string;
     sapCode: string;
-    mobileNumber: string;
+    customerMobileNumber: string;
   }[];
   users: string[];
   regions: string[];
@@ -72,7 +72,6 @@ export interface AuditLogRecord {
 
 export interface DBUser {
   id: string;
-  username: string;
   mobileNumber: string;
   role: string;
   region: string;
@@ -94,7 +93,7 @@ export interface UnifiedDashboardData {
   };
   filterOptions: {
     regions: string[];
-    users: { username: string; region: string }[];
+    users: { mobileNumber: string; region: string }[];
   };
   summary: {
     totalSubmissions: number;
@@ -103,7 +102,7 @@ export interface UnifiedDashboardData {
     inactiveUsers: number;
   };
   inactiveUsers: {
-    username: string;
+    mobileNumber: string;
     region: string;
     lastSubmission: string | null;
   }[];
@@ -112,12 +111,12 @@ export interface UnifiedDashboardData {
     contribution: { region: string; uniqueCount: number; percentage: number }[];
   };
   users: {
-    topChart: { username: string; uniqueCount: number }[];
-    activityDistribution: { username: string; uniqueCount: number; percentage: number }[];
+    topChart: { mobileNumber: string; uniqueCount: number }[];
+    activityDistribution: { mobileNumber: string; uniqueCount: number; percentage: number }[];
   };
   topPerformers: {
     regions: { rank: number; region: string; totalSubmissions: number }[];
-    users: { rank: number; username: string; totalSubmissions: number }[];
+    users: { rank: number; mobileNumber: string; totalSubmissions: number }[];
   };
 }
 
@@ -139,13 +138,15 @@ export const defaultGlobalDashboardFilters: GlobalDashboardFilters = {
 
 export interface UserManagementFilters {
   region: string;
-  users: string[];
+  mobileNumbers: string[];
+  role: string;
   statuses: string[];
 }
 
 export const defaultUserManagementFilters: UserManagementFilters = {
   region: '',
-  users: [],
+  mobileNumbers: [],
+  role: '',
   statuses: [],
 };
 

@@ -6,15 +6,17 @@ import { parseArrayParam } from '../utils/dashboardAnalytics';
 
 function parseUserListQuery(query: Record<string, unknown>) {
   const region = String(query.region || '').trim();
-  const users = parseArrayParam(query.users ?? query.user);
+  const role = String(query.role || '').trim();
+  const mobileNumbers = parseArrayParam(query.mobileNumbers ?? query.users ?? query.user);
   const statuses = parseArrayParam(query.status ?? query.statuses).map((value) => value.toLowerCase());
-  return { region, users, statuses };
+  return { region, role, mobileNumbers, statuses };
 }
 
 function buildUserListWhere(filters: ReturnType<typeof parseUserListQuery>) {
   const where: Record<string, unknown> = {};
   if (filters.region) where.region = { contains: filters.region };
-  if (filters.users.length) where.username = { in: filters.users };
+  if (filters.role) where.role = filters.role;
+  if (filters.mobileNumbers.length) where.mobileNumber = { in: filters.mobileNumbers };
   if (filters.statuses.length) where.status = { in: filters.statuses };
   return where;
 }
@@ -28,22 +30,22 @@ async function hashPassword(password: string): Promise<string> {
 export async function getUsers(req: Request, res: Response) {
   const filters = parseUserListQuery(req.query);
   try {
-    const [users, allUsernames] = await Promise.all([
+    const [users, allMobileNumbers] = await Promise.all([
       prisma.user.findMany({
         where: buildUserListWhere(filters),
-        select: { id: true, username: true, mobileNumber: true, role: true, region: true, status: true, createdAt: true, updatedAt: true },
+        select: { id: true, mobileNumber: true, role: true, region: true, status: true, createdAt: true, updatedAt: true },
         orderBy: { createdAt: 'desc' },
       }),
       prisma.user.findMany({
-        select: { username: true },
-        orderBy: { username: 'asc' },
+        select: { mobileNumber: true },
+        orderBy: { mobileNumber: 'asc' },
       }),
     ]);
     return res.status(200).json({
       success: true,
       data: {
         users,
-        filterOptions: { usernames: allUsernames.map((user) => user.username) },
+        filterOptions: { mobileNumbers: allMobileNumbers.map((user) => user.mobileNumber) },
       },
     });
   } catch (error) {
@@ -53,19 +55,14 @@ export async function getUsers(req: Request, res: Response) {
 }
 
 export async function createUser(req: Request, res: Response) {
-  const { username, mobileNumber, password, role, status, region } = req.body;
+  const { mobileNumber, password, role, status, region } = req.body;
   try {
-    const existingUsername = await prisma.user.findUnique({ where: { username } });
-    if (existingUsername) {
-      return res.status(400).json({ success: false, message: 'Username already exists' });
-    }
     const existingMobile = await prisma.user.findUnique({ where: { mobileNumber } });
     if (existingMobile) {
-      return res.status(400).json({ success: false, message: 'Mobile number already exists' });
+      return res.status(400).json({ success: false, message: 'Mobile Number already exists.' });
     }
     const user = await prisma.user.create({
       data: {
-        username,
         mobileNumber,
         passwordHash: await hashPassword(password),
         plainPassword: password,
@@ -73,7 +70,7 @@ export async function createUser(req: Request, res: Response) {
         region,
         status: status || 'active',
       },
-      select: { id: true, username: true, mobileNumber: true, role: true, region: true, status: true, createdAt: true },
+      select: { id: true, mobileNumber: true, role: true, region: true, status: true, createdAt: true },
     });
     return res.status(201).json({ success: true, data: user });
   } catch (error) {
@@ -84,21 +81,16 @@ export async function createUser(req: Request, res: Response) {
 
 export async function updateUser(req: Request, res: Response) {
   const { id } = req.params;
-  const { username, mobileNumber, password, role, status, region } = req.body;
+  const { mobileNumber, password, role, status, region } = req.body;
   try {
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
     const updateData: Record<string, unknown> = {};
-    if (username) {
-      const dup = await prisma.user.findFirst({ where: { username, id: { not: id } } });
-      if (dup) return res.status(400).json({ success: false, message: 'Username already taken' });
-      updateData.username = username;
-    }
     if (mobileNumber) {
       const dup = await prisma.user.findFirst({ where: { mobileNumber, id: { not: id } } });
-      if (dup) return res.status(400).json({ success: false, message: 'Mobile number already taken' });
+      if (dup) return res.status(400).json({ success: false, message: 'Mobile Number already exists.' });
       updateData.mobileNumber = mobileNumber;
     }
     if (password) {
@@ -112,7 +104,7 @@ export async function updateUser(req: Request, res: Response) {
     const updated = await prisma.user.update({
       where: { id },
       data: updateData,
-      select: { id: true, username: true, mobileNumber: true, role: true, region: true, status: true, updatedAt: true },
+      select: { id: true, mobileNumber: true, role: true, region: true, status: true, updatedAt: true },
     });
     return res.status(200).json({ success: true, data: updated });
   } catch (error) {
@@ -168,14 +160,14 @@ export async function exportUsersCsv(req: Request, res: Response) {
   try {
     const users = await prisma.user.findMany({
       where: buildUserListWhere(filters),
-      select: { username: true, mobileNumber: true, region: true, role: true, status: true, createdAt: true },
+      select: { mobileNumber: true, region: true, role: true, status: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
     return sendCsv(
       res,
       'users.csv',
-      ['Username', 'Mobile Number', 'Region', 'Role', 'Status', 'Created At'],
-      users.map((u) => [u.username, u.mobileNumber, u.region, u.role, u.status, u.createdAt.toISOString()])
+      ['Mobile Number', 'Region', 'Role', 'Status', 'Created At'],
+      users.map((u) => [u.mobileNumber, u.region, u.role, u.status, u.createdAt.toISOString()])
     );
   } catch (error) {
     console.error('exportUsersCsv error:', error);
@@ -188,14 +180,14 @@ export async function exportUsersExcel(req: Request, res: Response) {
   try {
     const users = await prisma.user.findMany({
       where: buildUserListWhere(filters),
-      select: { username: true, mobileNumber: true, region: true, role: true, status: true, createdAt: true },
+      select: { mobileNumber: true, region: true, role: true, status: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
     return sendExcel(
       res,
       'users.xls',
-      ['Username', 'Mobile Number', 'Region', 'Role', 'Status', 'Created At'],
-      users.map((u) => [u.username, u.mobileNumber, u.region, u.role, u.status, u.createdAt.toISOString()])
+      ['Mobile Number', 'Region', 'Role', 'Status', 'Created At'],
+      users.map((u) => [u.mobileNumber, u.region, u.role, u.status, u.createdAt.toISOString()])
     );
   } catch (error) {
     console.error('exportUsersExcel error:', error);
@@ -224,7 +216,7 @@ type SubmissionKpiRow = {
   sapCode: string;
   mobileNumber: string;
   submittedAt: Date;
-  user: { username: string; role: string } | null;
+  user: { mobileNumber: string; role: string } | null;
 };
 
 function parseDateRange(date?: unknown) {
@@ -264,7 +256,7 @@ function toDateKey(date: Date) {
 }
 
 export async function getSubmissions(req: Request, res: Response) {
-  const { sapCode, mobile, mobileNumber, date, username, sort = 'desc' } = req.query;
+  const { sapCode, mobile, mobileNumber, date, user, sort = 'desc' } = req.query;
   const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '20'), 10)));
   const skip = (page - 1) * limit;
@@ -276,7 +268,7 @@ export async function getSubmissions(req: Request, res: Response) {
     if (mobileFilter) where.mobileNumber = { contains: String(mobileFilter) };
     const submittedAt = parseDateRange(date);
     if (submittedAt) where.submittedAt = submittedAt;
-    if (username) where.user = { username: { contains: String(username) } };
+    if (user) where.user = { mobileNumber: { contains: String(user) } };
 
     const [total, submissions] = await prisma.$transaction([
       prisma.submission.count({ where }),
@@ -287,7 +279,7 @@ export async function getSubmissions(req: Request, res: Response) {
           sapCode: true,
           mobileNumber: true,
           submittedAt: true,
-          user: { select: { username: true } },
+          user: { select: { mobileNumber: true } },
         },
         orderBy: { submittedAt: sort === 'asc' ? 'asc' : 'desc' },
         skip,
@@ -331,8 +323,8 @@ export async function getSubmissionKpis(req: Request, res: Response) {
 
     const regularUsers = await prisma.user.findMany({
       where: { role: 'user' },
-      select: { id: true, username: true },
-      orderBy: { username: 'asc' },
+      select: { id: true, mobileNumber: true },
+      orderBy: { mobileNumber: 'asc' },
     });
 
     const rankingRows: SubmissionKpiRow[] = await prisma.submission.findMany({
@@ -344,34 +336,34 @@ export async function getSubmissionKpis(req: Request, res: Response) {
         sapCode: true,
         mobileNumber: true,
         submittedAt: true,
-        user: { select: { username: true, role: true } },
+        user: { select: { mobileNumber: true, role: true } },
       },
     });
 
     const rankingByUser = new Map<string, Set<string>>();
     rankingRows.forEach((row) => {
       if (!row.user || row.user.role !== 'user') return;
-      const username = row.user.username;
-      if (!rankingByUser.has(username)) rankingByUser.set(username, new Set());
-      rankingByUser.get(username)?.add(uniqueSubmissionKey(row));
+      const userMobile = row.user.mobileNumber;
+      if (!rankingByUser.has(userMobile)) rankingByUser.set(userMobile, new Set());
+      rankingByUser.get(userMobile)?.add(uniqueSubmissionKey(row));
     });
 
     const ranking = Array.from(rankingByUser.entries())
-      .map(([username, uniqueCount]) => ({ username, uniqueCount: uniqueCount.size }))
+      .map(([mobileNumber, uniqueCount]) => ({ mobileNumber, uniqueCount: uniqueCount.size }))
       .sort((a, b) => {
         const diff = a.uniqueCount - b.uniqueCount;
-        return rankingSort === 'asc' ? diff || a.username.localeCompare(b.username) : -diff || a.username.localeCompare(b.username);
+        return rankingSort === 'asc' ? diff || a.mobileNumber.localeCompare(b.mobileNumber) : -diff || a.mobileNumber.localeCompare(b.mobileNumber);
       });
 
     const usersWithoutSubmissions = regularUsers
-      .filter((regularUser) => !rankingByUser.has(regularUser.username))
-      .map((regularUser) => ({ username: regularUser.username, uniqueCount: 0 }));
+      .filter((regularUser) => !rankingByUser.has(regularUser.mobileNumber))
+      .map((regularUser) => ({ mobileNumber: regularUser.mobileNumber, uniqueCount: 0 }));
 
     const trendRange = getTrendDateRange(period, customStart, customEnd);
     const trendWhere: Record<string, unknown> = {
       ...baseWhere,
       ...(trendRange ? { submittedAt: trendRange } : {}),
-      ...(trendUser ? { user: { username: { contains: String(trendUser) } } } : {}),
+      ...(trendUser ? { user: { mobileNumber: { contains: String(trendUser) } } } : {}),
     };
 
     const trendRows: SubmissionKpiRow[] = await prisma.submission.findMany({
@@ -380,7 +372,7 @@ export async function getSubmissionKpis(req: Request, res: Response) {
         sapCode: true,
         mobileNumber: true,
         submittedAt: true,
-        user: { select: { username: true, role: true } },
+        user: { select: { mobileNumber: true, role: true } },
       },
       orderBy: { submittedAt: 'asc' },
     });
@@ -411,7 +403,7 @@ export async function getSubmissionKpis(req: Request, res: Response) {
       data: {
         ranking,
         usersWithoutSubmissions,
-        trendUsers: regularUsers.map((regularUser) => regularUser.username),
+        trendUsers: regularUsers.map((regularUser) => regularUser.mobileNumber),
         trend,
         totals: {
           uniqueSubmissions: new Set(rankingRows.map(uniqueSubmissionKey)).size,
@@ -427,7 +419,7 @@ export async function getSubmissionKpis(req: Request, res: Response) {
 }
 
 export async function exportSubmissions(req: Request, res: Response) {
-  const { sapCode, mobile, mobileNumber, date, username } = req.query;
+  const { sapCode, mobile, mobileNumber, date, user } = req.query;
   const mobileFilter = (mobile || mobileNumber) as string | undefined;
 
   try {
@@ -436,7 +428,7 @@ export async function exportSubmissions(req: Request, res: Response) {
     if (mobileFilter) where.mobileNumber = { contains: String(mobileFilter) };
     const submittedAt = parseDateRange(date);
     if (submittedAt) where.submittedAt = submittedAt;
-    if (username) where.user = { username: { contains: String(username) } };
+    if (user) where.user = { mobileNumber: { contains: String(user) } };
 
     const submissions = await prisma.submission.findMany({
       where,
@@ -445,16 +437,16 @@ export async function exportSubmissions(req: Request, res: Response) {
         sapCode: true,
         mobileNumber: true,
         submittedAt: true,
-        user: { select: { username: true } },
+        user: { select: { mobileNumber: true } },
       },
       orderBy: { submittedAt: 'desc' },
     });
 
-    const header = 'ID,Username,SAP Code,Mobile Number,Submitted At\n';
+    const header = 'ID,User Mobile Number,SAP Code,Customer Mobile Number,Submitted At\n';
     const rows = submissions.map(s =>
       [
         s.id,
-        s.user?.username ?? '',
+        s.user?.mobileNumber ?? '',
         s.sapCode,
         s.mobileNumber,
         new Date(s.submittedAt).toISOString(),

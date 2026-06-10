@@ -49,7 +49,8 @@ export function buildDashboardParams(filters: GlobalDashboardFilters) {
 export function buildUserMgmtParams(filters: UserManagementFilters) {
   const params: Record<string, string> = {};
   if (filters.region) params.region = filters.region;
-  if (filters.users.length) params.users = filters.users.join(',');
+  if (filters.role) params.role = filters.role;
+  if (filters.mobileNumbers.length) params.mobileNumbers = filters.mobileNumbers.join(',');
   if (filters.statuses.length) params.status = filters.statuses.join(',');
   return params;
 }
