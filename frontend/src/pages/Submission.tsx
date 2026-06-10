@@ -64,8 +64,6 @@ const Submission: React.FC = () => {
       <header className="w-full bg-white/80 backdrop-blur-md border-b border-slate-100 py-0 px-6 md:px-10 flex justify-between items-center sticky top-0 z-30 h-16">
         <div className="flex items-center gap-3">
           <img src="/logo.svg" alt="Humbee" className="h-8 object-contain" />
-          <span className="h-4 w-px bg-slate-200 hidden sm:block" />
-          <span className="text-xs font-semibold text-slate-400 hidden sm:block tracking-wider uppercase">customer profiler</span>
         </div>
 
         <div className="flex items-center gap-3">
@@ -93,10 +91,7 @@ const Submission: React.FC = () => {
             {/* Header */}
             <div className="mb-8 text-center">
               <img src="/logo.svg" alt="HumBee" className="h-10 object-contain mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-slate-800 tracking-tight">HumBee</h2>
-              <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
-                Enter the customer SAP Code and Mobile Number, then click Submit to generate and launch the PWA.
-              </p>
+              <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Customer Profiler</h2>
             </div>
 
             {/* Error */}
