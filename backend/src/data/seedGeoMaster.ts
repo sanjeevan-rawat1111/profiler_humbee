@@ -1,71 +1,111 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { randomUUID } from 'crypto';
 import prisma from '../prisma/client';
 
-type GeoJson = {
-  states: { state: string; stateCode: string; districts: string[] }[];
+type CsvRow = {
+  stateName: string;
+  stateCode: string;
+  districtName: string;
+  districtCode: string;
 };
 
-function slugify(value: string) {
+function formatGeoName(value: string) {
   return value
+    .trim()
     .toLowerCase()
-    .replace(/&/g, 'and')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
+    .replace(/(^|[\s&]+)([a-z])/g, (_, sep, char) => `${sep}${char.toUpperCase()}`);
 }
 
-function districtCode(stateCode: string, districtName: string) {
-  return `${stateCode}-${slugify(districtName)}`.slice(0, 64);
+function parseCsv(content: string): CsvRow[] {
+  const lines = content.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+
+  const header = lines[0].split(',').map((h) => h.trim().toLowerCase());
+  const stateNameIdx = header.indexOf('state_name');
+  const stateIdIdx = header.indexOf('state_id');
+  const districtNameIdx = header.indexOf('district_name');
+  const districtIdIdx = header.indexOf('district_id');
+
+  if ([stateNameIdx, stateIdIdx, districtNameIdx, districtIdIdx].some((idx) => idx < 0)) {
+    throw new Error('CSV must contain state_name, state_id, district_name, district_id columns');
+  }
+
+  return lines.slice(1).map((line) => {
+    const cols = line.split(',');
+    const rawState = cols[stateNameIdx]?.trim() ?? '';
+    const rawDistrict = cols[districtNameIdx]?.trim() ?? '';
+    return {
+      stateName: formatGeoName(rawState),
+      stateCode: cols[stateIdIdx]?.trim() ?? '',
+      districtName: formatGeoName(rawDistrict),
+      districtCode: cols[districtIdIdx]?.trim() ?? '',
+    };
+  }).filter((row) => row.stateCode && row.districtCode && row.stateName && row.districtName);
 }
 
-function loadGeoJson(): GeoJson {
+function loadHumbeeGeoCsv(): CsvRow[] {
   const candidates = [
-    join(__dirname, 'indianStatesDistricts.json'),
-    join(process.cwd(), 'src/data/indianStatesDistricts.json'),
+    join(__dirname, 'humbeeGeography.csv'),
+    join(process.cwd(), 'src/data/humbeeGeography.csv'),
   ];
   for (const filePath of candidates) {
     try {
-      return JSON.parse(readFileSync(filePath, 'utf8')) as GeoJson;
+      return parseCsv(readFileSync(filePath, 'utf8'));
     } catch {
       // try next path
     }
   }
-  throw new Error('Indian geo master JSON file not found');
+  throw new Error('HUMBEE geography CSV not found at backend/src/data/humbeeGeography.csv');
+}
+
+async function clearGeoMaster() {
+  await prisma.user.updateMany({ data: { stateId: null, districtId: null } });
+  await prisma.district.deleteMany();
+  await prisma.state.deleteMany();
 }
 
 export async function seedGeoMaster() {
-  const existingStates = await prisma.state.count();
-  if (existingStates > 0) {
-    return {
-      stateCount: existingStates,
-      districtCount: await prisma.district.count(),
-    };
-  }
+  const rows = loadHumbeeGeoCsv();
 
-  const data = loadGeoJson();
-  const stateRows = data.states.map((entry) => ({
-    id: randomUUID(),
-    stateName: entry.state,
-    stateCode: entry.stateCode,
-  }));
+  const stateEntries = new Map<string, { stateName: string; stateCode: string }>();
+  rows.forEach((row) => {
+    if (!stateEntries.has(row.stateCode)) {
+      stateEntries.set(row.stateCode, { stateName: row.stateName, stateCode: row.stateCode });
+    }
+  });
 
-  const stateIdByCode = new Map(stateRows.map((row) => [row.stateCode, row.id]));
-  const districtRows = data.states.flatMap((entry) =>
-    entry.districts.map((districtName) => ({
-      id: randomUUID(),
-      districtName,
-      districtCode: districtCode(entry.stateCode, districtName),
-      stateId: stateIdByCode.get(entry.stateCode)!,
+  await clearGeoMaster();
+
+  await prisma.state.createMany({
+    data: [...stateEntries.values()].map((state) => ({
+      stateName: state.stateName,
+      stateCode: state.stateCode,
     })),
-  );
+  });
 
-  await prisma.$transaction([
-    prisma.state.createMany({ data: stateRows }),
-    prisma.district.createMany({ data: districtRows }),
-  ]);
+  const states = await prisma.state.findMany({
+    select: { id: true, stateCode: true },
+  });
+  const stateIdByCode = new Map(states.map((state) => [state.stateCode, state.id]));
 
-  return { stateCount: stateRows.length, districtCount: districtRows.length };
+  const districtRows = rows.map((row) => {
+    const stateId = stateIdByCode.get(row.stateCode);
+    if (!stateId) {
+      throw new Error(`Missing state for code ${row.stateCode}`);
+    }
+    return {
+      districtName: row.districtName,
+      districtCode: row.districtCode,
+      stateId,
+    };
+  });
+
+  await prisma.district.createMany({ data: districtRows });
+
+  return {
+    stateCount: stateEntries.size,
+    districtCount: districtRows.length,
+  };
 }
 
 export async function resolveGeoIds(stateId: string, districtId: string) {
@@ -86,14 +126,14 @@ export async function resolveGeoIds(stateId: string, districtId: string) {
 
 export async function findGeoByNames(stateName: string, districtName: string) {
   const state = await prisma.state.findFirst({
-    where: { stateName: { equals: stateName, mode: 'insensitive' } },
+    where: { stateName: { equals: formatGeoName(stateName), mode: 'insensitive' } },
   });
   if (!state) return null;
 
   const district = await prisma.district.findFirst({
     where: {
       stateId: state.id,
-      districtName: { equals: districtName, mode: 'insensitive' },
+      districtName: { equals: formatGeoName(districtName), mode: 'insensitive' },
     },
   });
   if (!district) return null;
@@ -108,11 +148,10 @@ export async function findGeoByNames(stateName: string, districtName: string) {
 
 export async function backfillUserGeoFromText() {
   const users = await prisma.user.findMany({
-    where: { OR: [{ stateId: null }, { districtId: null }] },
-    select: { id: true, state: true, district: true },
+    select: { id: true, state: true, district: true, stateId: true, districtId: true },
   });
 
-  const fallback = await findGeoByNames('Delhi', 'New Delhi');
+  const fallback = await findGeoByNames('Delhi', 'Central Delhi');
   if (!fallback) return 0;
 
   let updated = 0;
@@ -122,11 +161,18 @@ export async function backfillUserGeoFromText() {
       : null;
 
     const geo = resolved ?? fallback;
+    if (user.stateId === geo.stateId && user.districtId === geo.districtId
+      && user.state === geo.stateName && user.district === geo.districtName) {
+      continue;
+    }
+
     await prisma.user.update({
       where: { id: user.id },
       data: {
         stateId: geo.stateId,
         districtId: geo.districtId,
+        state: geo.stateName,
+        district: geo.districtName,
         region: geo.stateName,
       },
     });

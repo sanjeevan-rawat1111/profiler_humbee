@@ -45,6 +45,12 @@ npm run db:seed
 
 ### 3. Running the Application Locally
 
+Copy the frontend env template (points the app at your local API on port 5000):
+```bash
+cd ../frontend
+cp .env.example .env
+```
+
 **Start Backend Server (Runs on port 5000):**
 ```bash
 cd backend

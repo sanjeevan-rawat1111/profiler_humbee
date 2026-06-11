@@ -20,14 +20,38 @@ export const submissionSchema = z.object({
   mobileNumber: z.string().trim().regex(/^[0-9]{10}$/, 'Mobile number must be exactly 10 digits'),
 });
 
+const managerRegionFields = {
+  assignedRegionIds: z.array(z.string().uuid()).optional().default([]),
+};
+
 export const createUserSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
   mobileNumber: mobileNumberField,
   password: z.string()
     .regex(/^(?=.*[A-Z])(?=.*\d).{6,}$/, 'Password must be at least 6 characters, contain 1 uppercase letter and 1 number'),
-  role: z.enum(['user', 'admin']).optional().default('user'),
-  ...geoFields,
+  role: z.enum(['user', 'admin', 'manager']).optional().default('user'),
+  stateId: geoFields.stateId.optional(),
+  districtId: geoFields.districtId.optional(),
+  ...managerRegionFields,
   status: z.enum(['active', 'inactive']).optional().default('active'),
+}).superRefine((data, ctx) => {
+  if (data.role === 'manager') {
+    if (!data.assignedRegionIds.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Managers must be assigned at least one Region',
+        path: ['assignedRegionIds'],
+      });
+    }
+    return;
+  }
+  if (data.role === 'user' && (!data.stateId || !data.districtId)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'State and District are required',
+      path: ['districtId'],
+    });
+  }
 });
 
 export const updateUserSchema = z.object({
@@ -36,14 +60,27 @@ export const updateUserSchema = z.object({
   password: z.string()
     .regex(/^(?=.*[A-Z])(?=.*\d).{6,}$/, 'Password must be at least 6 characters, contain 1 uppercase letter and 1 number')
     .optional(),
-  role: z.enum(['user', 'admin']).optional(),
+  role: z.enum(['user', 'admin', 'manager']).optional(),
   stateId: geoFields.stateId.optional(),
   districtId: geoFields.districtId.optional(),
+  ...managerRegionFields,
   status: z.enum(['active', 'inactive']).optional(),
 }).refine(
   (data) => (data.stateId === undefined) === (data.districtId === undefined),
   { message: 'State and District must be updated together', path: ['districtId'] },
 );
+
+export const regionSchema = z.object({
+  regionName: z.string().trim().min(1, 'Region name is required'),
+  status: z.enum(['active', 'inactive']).optional().default('active'),
+  stateIds: z.array(z.string().uuid()).optional().default([]),
+});
+
+export const updateRegionSchema = z.object({
+  regionName: z.string().trim().min(1, 'Region name is required').optional(),
+  status: z.enum(['active', 'inactive']).optional(),
+  stateIds: z.array(z.string().uuid()).optional(),
+});
 
 export const submissionsQuerySchema = z.object({
   sapCode: z.string().optional(),

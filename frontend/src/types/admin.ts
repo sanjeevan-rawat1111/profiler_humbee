@@ -2,9 +2,12 @@ import type { GeoDistrict, GeoState } from './geo';
 
 export type DirectoryDownloadMode = 'normal' | 'master';
 
+export type GeographyLevel = 'region' | 'state' | 'district';
+
 export interface SubmissionFilters {
   search: string;
   user: string;
+  regionId: string;
   stateId: string;
   districtId: string;
   sapCode: string;
@@ -99,6 +102,7 @@ export interface AuditFilters {
   search: string;
   name: string;
   user: string;
+  regionId: string;
   stateId: string;
   districtId: string;
   eventType: string;
@@ -111,6 +115,7 @@ export const defaultAuditFilters: AuditFilters = {
   search: '',
   name: '',
   user: '',
+  regionId: '',
   stateId: '',
   districtId: '',
   eventType: '',
@@ -129,6 +134,8 @@ export interface DBUser {
   districtId: string | null;
   state: string;
   district: string;
+  assignedRegionIds?: string[];
+  assignedRegionNames?: string[];
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -142,11 +149,14 @@ export interface UnifiedDashboardData {
     period: DashboardPeriod;
     fromDate: string;
     toDate: string;
+    regionId: string;
     stateId: string;
     districtId: string;
+    geoLevel: GeographyLevel;
     users: string[];
   };
   filterOptions: {
+    regions: import('./geo').GeoRegion[];
     states: GeoState[];
     districts: GeoDistrict[];
     users: {
@@ -180,6 +190,13 @@ export interface UnifiedDashboardData {
     activityDistribution: { name: string; mobileNumber: string; uniqueCount: number; percentage: number }[];
   };
   topPerformers: {
+    geography: {
+      rank: number;
+      name: string;
+      totalSubmissions: number;
+      activeUsers: number;
+      contributionPct: number;
+    }[];
     states: { rank: number; state: string; totalSubmissions: number }[];
     users: { rank: number; name: string; mobileNumber: string; totalSubmissions: number }[];
   };
@@ -189,8 +206,10 @@ export interface GlobalDashboardFilters {
   period: DashboardPeriod;
   fromDate: string;
   toDate: string;
+  regionId: string;
   stateId: string;
   districtId: string;
+  geoLevel: GeographyLevel;
   users: string[];
 }
 
@@ -198,12 +217,15 @@ export const defaultGlobalDashboardFilters: GlobalDashboardFilters = {
   period: 'week',
   fromDate: '',
   toDate: '',
+  regionId: '',
   stateId: '',
   districtId: '',
+  geoLevel: 'state',
   users: [],
 };
 
 export interface UserManagementFilters {
+  regionId: string;
   stateId: string;
   districtId: string;
   mobileNumbers: string[];
@@ -212,6 +234,7 @@ export interface UserManagementFilters {
 }
 
 export const defaultUserManagementFilters: UserManagementFilters = {
+  regionId: '',
   stateId: '',
   districtId: '',
   mobileNumbers: [],
@@ -222,6 +245,7 @@ export const defaultUserManagementFilters: UserManagementFilters = {
 export const defaultFilters: SubmissionFilters = {
   search: '',
   user: '',
+  regionId: '',
   stateId: '',
   districtId: '',
   sapCode: '',

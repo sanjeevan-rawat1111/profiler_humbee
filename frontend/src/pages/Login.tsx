@@ -44,7 +44,7 @@ const Login: React.FC = () => {
     setIsSubmitting(true);
     try {
       const { role } = await login(mobileNumber.trim(), password);
-      const dest = from || (role === 'admin' ? '/admin' : '/submission');
+      const dest = from || (role === 'admin' || role === 'manager' ? '/admin' : '/submission');
       window.location.assign(dest);
     } catch (err: any) {
       setServerError(err.response?.data?.message ?? err.message ?? 'Login failed. Please try again.');

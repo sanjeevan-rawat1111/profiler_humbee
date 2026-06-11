@@ -8,22 +8,60 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+model Region {
+  id           String        @id @default(uuid())
+  regionName   String        @unique @map("region_name")
+  regionCode   String?       @unique @map("region_code")
+  status       String        @default("active")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  regionStates RegionState[]
+  userRegions  UserRegion[]
+
+  @@map("regions")
+}
+
+model RegionState {
+  id       String @id @default(uuid())
+  regionId String @map("region_id")
+  stateId  String @unique @map("state_id")
+  region   Region @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  state    State  @relation(fields: [stateId], references: [id], onDelete: Cascade)
+
+  @@index([regionId])
+  @@map("region_states")
+}
+
+model UserRegion {
+  id       String @id @default(uuid())
+  userId   String @map("user_id")
+  regionId String @map("region_id")
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  region   Region @relation(fields: [regionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, regionId])
+  @@index([userId])
+  @@index([regionId])
+  @@map("user_regions")
+}
+
 model State {
-  id        String     @id @default(uuid())
-  stateName String     @unique @map("state_name")
-  stateCode String     @unique @map("state_code")
-  districts District[]
-  users     User[]
+  id           String        @id @default(uuid())
+  stateName    String        @unique @map("state_name")
+  stateCode    String        @unique @map("state_code")
+  districts    District[]
+  users        User[]
+  regionStates RegionState[]
 
   @@map("states")
 }
 
 model District {
-  id           String   @id @default(uuid())
-  districtName String   @map("district_name")
-  districtCode String   @unique @map("district_code")
-  stateId      String   @map("state_id")
-  state        State    @relation(fields: [stateId], references: [id], onDelete: Restrict)
+  id           String @id @default(uuid())
+  districtName String @map("district_name")
+  districtCode String @unique @map("district_code")
+  stateId      String @map("state_id")
+  state        State  @relation(fields: [stateId], references: [id], onDelete: Restrict)
   users        User[]
 
   @@unique([stateId, districtName])
@@ -37,7 +75,7 @@ model User {
   mobileNumber  String       @unique @map("mobile_number")
   passwordHash  String       @map("password_hash")
   plainPassword String?      @map("plain_password")
-  role          String       @default("user") // "user" or "admin"
+  role          String       @default("user") // "user", "admin", or "manager"
   region        String
   stateId       String?      @map("state_id")
   districtId    String?      @map("district_id")
@@ -50,6 +88,7 @@ model User {
   districtRef   District?    @relation(fields: [districtId], references: [id], onDelete: Restrict)
   submissions   Submission[]
   auditLogs     AuditLog[]
+  userRegions   UserRegion[]
 
   @@map("users")
 }

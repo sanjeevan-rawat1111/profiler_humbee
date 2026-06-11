@@ -1,6 +1,8 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import prisma from '../prisma/client';
+import { AuthenticatedRequest } from '../middleware/auth';
 import { sendCsv, sendExcel } from '../utils/exportHelpers';
+import { buildScopedFilterOptions, resolveSubmissionFetchOptions } from '../utils/geographyScope';
 import {
   fetchFilteredSubmissions,
   filterAnalyticsRows,
@@ -167,7 +169,7 @@ function sortDirectory(rows: DirectoryRow[], sortBy: string, sortDir: string) {
   });
 }
 
-export async function getSubmissionDirectory(req: Request, res: Response) {
+export async function getSubmissionDirectory(req: AuthenticatedRequest, res: Response) {
   const filters = parseFilterQuery(req.query);
   const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '20'), 10)));
@@ -175,16 +177,29 @@ export async function getSubmissionDirectory(req: Request, res: Response) {
   const sortDir = String(req.query.sortDir || 'desc');
 
   try {
-    const rows = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters));
+    const fetchOptions = await resolveSubmissionFetchOptions(filters, req.geographyScope);
+    const rows = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters, fetchOptions));
     const aggregated = sortDirectory(aggregateDirectory(rows), sortBy, sortDir);
     const total = aggregated.length;
     const start = (page - 1) * limit;
+
+    const filterOptions = await buildScopedFilterOptions(
+      req.geographyScope ?? { unrestricted: true, districtIds: [], stateIds: [], regionIds: [] },
+      filters.regionId,
+      filters.stateId,
+    );
 
     return res.status(200).json({
       success: true,
       data: {
         records: aggregated.slice(start, start + limit),
         pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+        filterOptions: {
+          users: filterOptions.users.map((user) => ({
+            name: user.name,
+            mobileNumber: user.mobileNumber,
+          })),
+        },
       },
     });
   } catch (error) {
@@ -193,14 +208,15 @@ export async function getSubmissionDirectory(req: Request, res: Response) {
   }
 }
 
-export async function getUserSubmissionDetails(req: Request, res: Response) {
+export async function getUserSubmissionDetails(req: AuthenticatedRequest, res: Response) {
   const { userId } = req.params;
   const groupSapCode = String(req.query.groupSapCode || '');
   const groupVcpMobile = String(req.query.groupVcpMobile || '');
   const filters = parseFilterQuery(req.query);
 
   try {
-    const rows = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters));
+    const fetchOptions = await resolveSubmissionFetchOptions(filters, req.geographyScope);
+    const rows = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters, fetchOptions));
     const details = rows
       .filter((row) =>
         row.userId === userId
@@ -222,13 +238,14 @@ export async function getUserSubmissionDetails(req: Request, res: Response) {
   }
 }
 
-export async function exportDirectoryCsv(req: Request, res: Response) {
+export async function exportDirectoryCsv(req: AuthenticatedRequest, res: Response) {
   try {
     const filters = parseFilterQuery(req.query);
     const sortBy = String(req.query.sortBy || 'lastSubmission');
     const sortDir = String(req.query.sortDir || 'desc');
     const downloadMode = String(req.query.downloadMode || 'normal');
-    const submissions = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters));
+    const fetchOptions = await resolveSubmissionFetchOptions(filters, req.geographyScope);
+    const submissions = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters, fetchOptions));
 
     if (downloadMode === 'master') {
       const rows = sortMasterRows(buildMasterRows(submissions), sortBy, sortDir);
@@ -253,13 +270,14 @@ export async function exportDirectoryCsv(req: Request, res: Response) {
   }
 }
 
-export async function exportDirectoryExcel(req: Request, res: Response) {
+export async function exportDirectoryExcel(req: AuthenticatedRequest, res: Response) {
   try {
     const filters = parseFilterQuery(req.query);
     const sortBy = String(req.query.sortBy || 'lastSubmission');
     const sortDir = String(req.query.sortDir || 'desc');
     const downloadMode = String(req.query.downloadMode || 'normal');
-    const submissions = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters));
+    const fetchOptions = await resolveSubmissionFetchOptions(filters, req.geographyScope);
+    const submissions = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters, fetchOptions));
 
     if (downloadMode === 'master') {
       const rows = sortMasterRows(buildMasterRows(submissions), sortBy, sortDir);

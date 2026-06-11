@@ -69,8 +69,6 @@ const Submission: React.FC = () => {
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
             <span className="text-xs font-bold text-slate-700 block">{user?.name}</span>
-            <span className="text-[10px] text-slate-500 font-mono">{user?.mobileNumber}</span>
-            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">{user?.role}</span>
           </div>
           <button
             onClick={handleLogout}

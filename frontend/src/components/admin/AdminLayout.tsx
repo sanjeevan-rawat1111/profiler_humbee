@@ -1,8 +1,8 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Users, FileText, Shield, LogOut, LayoutDashboard, List } from 'lucide-react';
+import { Settings, FileText, Shield, LogOut, LayoutDashboard, List } from 'lucide-react';
 
-type MainTab = 'submissions' | 'users' | 'audit';
+type MainTab = 'submissions' | 'management' | 'audit';
 type SubmissionTab = 'directory' | 'kpi';
 
 interface AdminLayoutProps {
@@ -10,6 +10,7 @@ interface AdminLayoutProps {
   submissionTab: SubmissionTab;
   onMainTabChange: (tab: MainTab) => void;
   onSubmissionTabChange: (tab: SubmissionTab) => void;
+  isAdmin?: boolean;
   children: React.ReactNode;
 }
 
@@ -18,6 +19,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
   submissionTab,
   onMainTabChange,
   onSubmissionTabChange,
+  isAdmin = true,
   children,
 }) => {
   const { user, logout } = useAuth();
@@ -52,7 +54,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
                 }`}
               >
                 <List className="w-3.5 h-3.5" />
-                User Directory
+                Submission Logs
               </button>
               <button
                 onClick={() => onSubmissionTabChange('kpi')}
@@ -66,15 +68,17 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
             </div>
           )}
 
-          <button
-            onClick={() => onMainTabChange('users')}
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
-              mainTab === 'users' ? 'bg-amber-50 text-amber-900 border-l-4 border-amber-500' : 'text-slate-500 hover:bg-slate-50'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            User Management
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => onMainTabChange('management')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
+                mainTab === 'management' ? 'bg-amber-50 text-amber-900 border-l-4 border-amber-500' : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <Settings className="w-4 h-4" />
+              Management
+            </button>
+          )}
 
           <button
             onClick={() => onMainTabChange('audit')}
@@ -89,8 +93,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
 
         <div className="p-4 border-t border-slate-100 shrink-0 bg-white">
           <div className="text-xs font-bold text-slate-700 mb-1">{user?.name}</div>
-          <div className="text-[10px] text-slate-500 font-mono mb-0.5">{user?.mobileNumber}</div>
-          <div className="text-[10px] text-slate-400 uppercase mb-3">{user?.role}</div>
+          <div className="text-[10px] text-slate-500 font-mono mb-3">{user?.mobileNumber}</div>
           <button
             onClick={logout}
             className="w-full flex items-center justify-center gap-1.5 px-3 py-2 border border-slate-200 hover:border-red-200 hover:bg-red-50 text-slate-500 hover:text-red-600 rounded-lg text-xs font-semibold transition-all cursor-pointer"

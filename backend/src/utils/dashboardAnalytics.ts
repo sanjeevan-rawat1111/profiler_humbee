@@ -152,17 +152,76 @@ export function parseArrayParam(value: unknown): string[] {
 
 export function filterRowsBySelections(
   rows: SubmissionRow[],
+  regionId: string,
   stateId: string,
   districtId: string,
   users: string[],
+  stateRegionMap?: Map<string, { regionId: string | null; regionName: string }>,
+  regionStateIds?: string[],
 ) {
   return rows.filter((row) => {
     if (!row.user) return false;
+    if (regionId === '__blocked__' || stateId === '__blocked__' || districtId === '__blocked__') return false;
+    if (regionId && stateRegionMap) {
+      const info = stateRegionMap.get(row.user.stateId || '');
+      if (!info || info.regionId !== regionId) return false;
+    } else if (regionStateIds?.length && row.user.stateId && !regionStateIds.includes(row.user.stateId)) {
+      return false;
+    }
     if (stateId && row.user.stateId !== stateId) return false;
     if (districtId && row.user.districtId !== districtId) return false;
     if (users.length && !users.includes(row.user.mobileNumber)) return false;
     return true;
   });
+}
+
+export type GeographyLevel = 'region' | 'state' | 'district';
+
+export function geographyLeaderboardFromRows(
+  rows: SubmissionRow[],
+  level: GeographyLevel,
+  stateRegionMap: Map<string, { regionId: string | null; regionName: string }>,
+) {
+  const byGeo = new Map<string, { name: string; submissions: Set<string>; users: Set<string> }>();
+
+  rows.forEach((row) => {
+    if (!row.user) return;
+    let key = '';
+    let name = 'Unknown';
+
+    if (level === 'district') {
+      key = row.user.districtId || row.user.district || 'unknown';
+      name = row.user.district || 'Unknown';
+    } else if (level === 'state') {
+      key = row.user.stateId || row.user.state || 'unknown';
+      name = row.user.state || 'Unknown';
+    } else {
+      const info = stateRegionMap.get(row.user.stateId || '');
+      key = info?.regionId || 'unassigned';
+      name = info?.regionName || 'Unassigned';
+    }
+
+    if (!byGeo.has(key)) {
+      byGeo.set(key, { name, submissions: new Set(), users: new Set() });
+    }
+    const entry = byGeo.get(key)!;
+    entry.submissions.add(uniqueSubmissionKey(row));
+    if (row.user.mobileNumber) entry.users.add(row.user.mobileNumber);
+  });
+
+  const totalSubmissions = [...byGeo.values()].reduce((sum, entry) => sum + entry.submissions.size, 0);
+
+  return Array.from(byGeo.values())
+    .map((entry) => ({
+      name: entry.name,
+      totalSubmissions: entry.submissions.size,
+      activeUsers: entry.users.size,
+      contributionPct: totalSubmissions
+        ? Math.round((entry.submissions.size / totalSubmissions) * 1000) / 10
+        : 0,
+    }))
+    .sort((a, b) => b.totalSubmissions - a.totalSubmissions || b.activeUsers - a.activeUsers)
+    .map((item, index) => ({ rank: index + 1, ...item }));
 }
 
 export function trendByUser(rows: SubmissionRow[], range: { gte: Date; lte: Date }) {

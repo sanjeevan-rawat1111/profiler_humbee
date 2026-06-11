@@ -12,6 +12,7 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "ts-node src/prisma/seed.ts",
+    "db:sync-geo": "ts-node src/scripts/syncGeo.ts",
     "db:seed:prod": "node dist/prisma/seed.js"
   },
   "engines": {
@@ -19,9 +20,6 @@
   },
   "dependencies": {
     "@prisma/client": "^5.14.0",
-    "prisma": "^5.14.0",
-    "rimraf": "^5.0.7",
-    "typescript": "^5.4.5",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -29,6 +27,9 @@
     "express-rate-limit": "^7.2.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "prisma": "^5.14.0",
+    "rimraf": "^5.0.7",
+    "typescript": "^5.4.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {

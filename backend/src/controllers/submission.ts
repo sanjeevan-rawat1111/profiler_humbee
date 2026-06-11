@@ -41,6 +41,13 @@ export async function createSubmission(req: AuthenticatedRequest, res: Response)
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
+  if (req.user.role !== 'user') {
+    return res.status(403).json({
+      success: false,
+      message: 'Only salesperson accounts can create submission logs.',
+    });
+  }
+
   const { sapCode, mobileNumber } = req.body;
 
   try {

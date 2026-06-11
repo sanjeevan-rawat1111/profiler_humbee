@@ -3,7 +3,8 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recha
 import { RefreshCw, TrendingUp, Users, MapPin, UserX } from 'lucide-react';
 import api from '../../services/api';
 import SearchableMultiSelect from './SearchableMultiSelect';
-import StateDistrictSelect from '../StateDistrictSelect';
+import RegionStateDistrictSelect from '../RegionStateDistrictSelect';
+import type { GeographyLevel } from '../../types/admin';
 import RankedListPanel from './RankedListPanel';
 import ScrollableBarChart from './ScrollableBarChart';
 import type { GlobalDashboardFilters, UnifiedDashboardData, DashboardPeriod } from '../../types/admin';
@@ -74,12 +75,13 @@ const AnalyticsDashboardTab: React.FC = () => {
     const { users } = data.filterOptions;
     return users
       .filter((u) => {
+        if (filters.regionId && data.filterOptions.states.find((s) => s.id === u.stateId)?.regionId !== filters.regionId) return false;
         if (filters.stateId && u.stateId !== filters.stateId) return false;
         if (filters.districtId && u.districtId !== filters.districtId) return false;
         return true;
       })
       .map((u) => u.mobileNumber);
-  }, [data, filters.stateId, filters.districtId]);
+  }, [data, filters.regionId, filters.stateId, filters.districtId]);
 
   useEffect(() => {
     if (!filters.users.length) return;
@@ -120,7 +122,13 @@ const AnalyticsDashboardTab: React.FC = () => {
     [data],
   );
 
-  const hasScopeFilters = filters.stateId || filters.districtId || filters.users.length > 0;
+  const hasScopeFilters = filters.regionId || filters.stateId || filters.districtId || filters.users.length > 0;
+
+  const GEO_LEVEL_OPTIONS: { id: GeographyLevel; label: string }[] = [
+    { id: 'region', label: 'Region' },
+    { id: 'state', label: 'State' },
+    { id: 'district', label: 'District' },
+  ];
 
   return (
     <div className="space-y-8 pb-12">
@@ -183,10 +191,11 @@ const AnalyticsDashboardTab: React.FC = () => {
             </div>
           )}
 
-          <StateDistrictSelect
+          <RegionStateDistrictSelect
+            regionId={filters.regionId}
             stateId={filters.stateId}
             districtId={filters.districtId}
-            onChange={(stateId, districtId) => setFilters((f) => ({ ...f, stateId, districtId }))}
+            onChange={(regionId, stateId, districtId) => setFilters((f) => ({ ...f, regionId, stateId, districtId }))}
           />
 
           <SearchableMultiSelect
@@ -201,12 +210,13 @@ const AnalyticsDashboardTab: React.FC = () => {
           {hasScopeFilters && (
             <div className="flex items-center gap-2 text-[11px] text-slate-500">
               <span className="font-semibold">Active filters:</span>
+              {filters.regionId && <span>Region selected</span>}
               {filters.stateId && <span>State selected</span>}
               {filters.districtId && <span>District selected</span>}
               {filters.users.length > 0 && <span>{filters.users.length} user(s)</span>}
               <button
                 type="button"
-                onClick={() => setFilters((f) => ({ ...f, stateId: '', districtId: '', users: [] }))}
+                onClick={() => setFilters((f) => ({ ...f, regionId: '', stateId: '', districtId: '', users: [] }))}
                 className="text-humbee-700 font-semibold hover:underline cursor-pointer"
               >
                 Reset filters
@@ -237,15 +247,54 @@ const AnalyticsDashboardTab: React.FC = () => {
           <section>
             <SectionHeader title="Top Performers" subtitle="Rankings for the selected period and filters" />
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              <ChartPanel title="Top States Ranking" className="min-h-[420px]">
-                <ScrollableBarChart
-                  data={data.topPerformers.states.map((item) => ({
-                    label: item.state,
-                    value: item.totalSubmissions,
-                  }))}
-                  color="#3b82f6"
-                />
-              </ChartPanel>
+              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm min-h-[420px]">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <h4 className="text-sm font-bold text-slate-800">Top Geography Ranking</h4>
+                  <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+                    {GEO_LEVEL_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setFilters((f) => ({ ...f, geoLevel: opt.id }))}
+                        className={`px-3 py-1.5 text-[11px] font-semibold transition-colors cursor-pointer ${
+                          filters.geoLevel === opt.id
+                            ? 'bg-humbee-600 text-white'
+                            : 'bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="overflow-auto max-h-[340px]">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-slate-500 border-b border-slate-100">
+                        <th className="py-2 text-left">Rank</th>
+                        <th className="py-2 text-left">Geography</th>
+                        <th className="py-2 text-right">Submissions</th>
+                        <th className="py-2 text-right">Active Users</th>
+                        <th className="py-2 text-right">Contribution %</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {(data.topPerformers.geography ?? []).map((item) => (
+                        <tr key={`${item.rank}-${item.name}`}>
+                          <td className="py-2 font-bold text-slate-700">{item.rank}</td>
+                          <td className="py-2 text-slate-800">{item.name}</td>
+                          <td className="py-2 text-right font-semibold">{formatCount(item.totalSubmissions)}</td>
+                          <td className="py-2 text-right">{formatCount(item.activeUsers)}</td>
+                          <td className="py-2 text-right text-slate-500">{item.contributionPct}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {!data.topPerformers.geography?.length && (
+                    <div className="py-8 text-center text-slate-400">No ranking data for selected filters</div>
+                  )}
+                </div>
+              </div>
               <ChartPanel title="Top Users Ranking" className="min-h-[420px]">
                 <ScrollableBarChart
                   data={data.topPerformers.users.map((item) => ({

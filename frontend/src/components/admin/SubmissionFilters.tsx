@@ -1,7 +1,7 @@
 import React from 'react';
 import { Search, FilterX, RefreshCw, FileSpreadsheet, FileDown } from 'lucide-react';
 import DatePeriodFilter from './DatePeriodFilter';
-import StateDistrictSelect from '../StateDistrictSelect';
+import RegionStateDistrictSelect from '../RegionStateDistrictSelect';
 import type { DirectoryDownloadMode, SubmissionFilters as Filters } from '../../types/admin';
 
 interface Props {
@@ -57,10 +57,10 @@ const SubmissionFiltersBar: React.FC<Props> = ({
           value={filters.user}
           onChange={(e) => update('user', e.target.value)}
           className="input-style-compact"
-          aria-label="User Mobile Number"
-          title="User Mobile Number (Officer)"
+          aria-label="Salesperson"
+          title="Salesperson"
         >
-          <option value="">All Officers</option>
+          <option value="">All Salespersons</option>
           {users.map((officer) => (
             <option key={officer.mobileNumber} value={officer.mobileNumber}>{officer.name}</option>
           ))}
@@ -81,12 +81,11 @@ const SubmissionFiltersBar: React.FC<Props> = ({
         />
       </div>
 
-      <StateDistrictSelect
+      <RegionStateDistrictSelect
+        regionId={filters.regionId}
         stateId={filters.stateId}
         districtId={filters.districtId}
-        onChange={(stateId, districtId) => setFilters((prev) => ({ ...prev, stateId, districtId }))}
-        stateLabel=""
-        districtLabel=""
+        onChange={(regionId, stateId, districtId) => setFilters((prev) => ({ ...prev, regionId, stateId, districtId }))}
       />
 
       <div className="flex flex-wrap justify-between gap-2 pt-1">

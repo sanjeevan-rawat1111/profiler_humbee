@@ -1,6 +1,7 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import prisma from '../prisma/client';
 import { excludedAnalyticsMobileNumbers, isExcludedAnalyticsMobile } from '../config/excludedAnalyticsUsers';
+import { AuthenticatedRequest } from '../middleware/auth';
 import {
   countUniqueSubmissions,
   fetchFilteredSubmissions,
@@ -11,6 +12,8 @@ import {
   countActiveStates,
   countActiveUsers,
   filterRowsBySelections,
+  geographyLeaderboardFromRows,
+  GeographyLevel,
   leaderboardFromRows,
   parseArrayParam,
   prepareAnalyticsRows,
@@ -19,76 +22,69 @@ import {
   uniqueByState,
   uniqueByUser,
 } from '../utils/dashboardAnalytics';
+import {
+  buildScopedFilterOptions,
+  filterRowsByGeographyScope,
+  loadStateRegionMap,
+  resolveRegionStateIds,
+  resolveSubmissionFetchOptions,
+} from '../utils/geographyScope';
 
 function parseUnifiedQuery(query: Record<string, unknown>) {
   const period = String(query.period || 'week');
   const fromDate = String(query.fromDate || '').trim();
   const toDate = String(query.toDate || '').trim();
+  const regionId = String(query.regionId || '').trim();
   const stateId = String(query.stateId || '').trim();
   const districtId = String(query.districtId || '').trim();
+  const geoLevel = (['region', 'state', 'district'].includes(String(query.geoLevel || 'state'))
+    ? String(query.geoLevel)
+    : 'state') as GeographyLevel;
   const users = parseArrayParam(query.users ?? query.user);
-  return { period, fromDate, toDate, stateId, districtId, users };
+  return { period, fromDate, toDate, regionId, stateId, districtId, geoLevel, users };
 }
 
-async function loadAllAnalyticsRows() {
-  return prepareAnalyticsRows(await fetchFilteredSubmissions(prisma, parseFilterQuery({})));
-}
-
-async function buildFilterOptions(stateId: string) {
-  const [states, districts, dbUsers] = await Promise.all([
-    prisma.state.findMany({
-      select: { id: true, stateName: true, stateCode: true },
-      orderBy: { stateName: 'asc' },
-    }),
-    stateId
-      ? prisma.district.findMany({
-        where: { stateId },
-        select: { id: true, districtName: true, districtCode: true, stateId: true },
-        orderBy: { districtName: 'asc' },
-      })
-      : Promise.resolve([]),
-    prisma.user.findMany({
-      where: {
-        role: 'user',
-        mobileNumber: { notIn: excludedAnalyticsMobileNumbers() },
-        ...(stateId ? { stateId } : {}),
-      },
-      select: { name: true, mobileNumber: true, stateId: true, districtId: true, state: true, district: true },
-      orderBy: { mobileNumber: 'asc' },
-    }),
-  ]);
-
-  return {
-    states,
-    districts,
-    users: dbUsers.map((user) => ({
-      name: user.name,
-      mobileNumber: user.mobileNumber,
-      stateId: user.stateId,
-      districtId: user.districtId,
-      state: user.state,
-      district: user.district,
-    })),
-  };
+async function loadScopedAnalyticsRows(req: AuthenticatedRequest) {
+  const filters = parseFilterQuery({});
+  const fetchOptions = await resolveSubmissionFetchOptions(filters, req.geographyScope);
+  const rows = await fetchFilteredSubmissions(prisma, filters, fetchOptions);
+  return filterRowsByGeographyScope(prepareAnalyticsRows(rows), req.geographyScope ?? { unrestricted: true, districtIds: [], stateIds: [], regionIds: [] });
 }
 
 async function buildInactiveUsers(
   allRows: ReturnType<typeof prepareAnalyticsRows>,
   rangeRows: ReturnType<typeof prepareAnalyticsRows>,
+  regionId: string,
   stateId: string,
   districtId: string,
   users: string[],
+  scope: AuthenticatedRequest['geographyScope'],
 ) {
   const userWhere: Record<string, unknown> = {
     role: 'user',
     mobileNumber: { notIn: excludedAnalyticsMobileNumbers() },
   };
-  if (stateId) userWhere.stateId = stateId;
-  if (districtId) userWhere.districtId = districtId;
+  if (districtId) {
+    userWhere.districtId = districtId;
+  } else if (stateId) {
+    userWhere.stateId = stateId;
+  } else if (regionId) {
+    const regionStateIds = await resolveRegionStateIds(regionId);
+    userWhere.stateId = { in: regionStateIds.length ? regionStateIds : ['__none__'] };
+  }
   if (users.length) {
     userWhere.mobileNumber = {
       in: users.filter((mobile) => !isExcludedAnalyticsMobile(mobile)),
     };
+  }
+  if (scope && !scope.unrestricted) {
+    if (scope.districtIds.length) {
+      userWhere.districtId = districtId && scope.districtIds.includes(districtId)
+        ? districtId
+        : { in: scope.districtIds };
+    } else {
+      userWhere.districtId = { in: ['__none__'] };
+    }
   }
 
   const scopedUsers = await prisma.user.findMany({
@@ -100,7 +96,7 @@ async function buildInactiveUsers(
     rangeRows.map((row) => row.user?.mobileNumber).filter(Boolean) as string[],
   );
 
-  const lifetimeByUser = uniqueByUser(filterRowsBySelections(allRows, stateId, districtId, users));
+  const lifetimeByUser = uniqueByUser(filterRowsBySelections(allRows, regionId, stateId, districtId, users));
 
   const inactiveList = scopedUsers
     .filter((user) => !activeMobileNumbers.has(user.mobileNumber))
@@ -127,15 +123,45 @@ async function buildInactiveUsers(
   };
 }
 
-export async function getUnifiedDashboard(req: Request, res: Response) {
-  const { period, fromDate, toDate, stateId, districtId, users } = parseUnifiedQuery(req.query);
+export async function getUnifiedDashboard(req: AuthenticatedRequest, res: Response) {
+  const { period, fromDate, toDate, regionId, stateId, districtId, geoLevel, users } = parseUnifiedQuery(req.query);
+  const scope = req.geographyScope ?? { unrestricted: true, districtIds: [], stateIds: [], regionIds: [] };
+
+  const effectiveRegionId = scope.unrestricted
+    ? regionId
+    : (regionId && scope.regionIds.includes(regionId) ? regionId : regionId ? '__blocked__' : '');
+  const effectiveStateId = scope.unrestricted
+    ? stateId
+    : (stateId && scope.stateIds.includes(stateId) ? stateId : stateId ? '__blocked__' : '');
+  const effectiveDistrictId = scope.unrestricted
+    ? districtId
+    : (districtId && scope.districtIds.includes(districtId) ? districtId : districtId ? '__blocked__' : '');
+
   try {
-    const allRows = await loadAllAnalyticsRows();
-    const filteredRows = filterRowsBySelections(allRows, stateId, districtId, users);
+    const allRows = await loadScopedAnalyticsRows(req);
+    const stateRegionMap = await loadStateRegionMap();
+    const regionStateIds = effectiveRegionId ? await resolveRegionStateIds(effectiveRegionId) : undefined;
+    const filteredRows = filterRowsBySelections(
+      allRows,
+      effectiveRegionId,
+      effectiveStateId,
+      effectiveDistrictId,
+      users,
+      stateRegionMap,
+      regionStateIds,
+    );
     const range = resolveDashboardRange(period, fromDate, toDate);
     const rangeRows = rowsInRange(filteredRows, range);
-    const filterOptions = await buildFilterOptions(stateId);
-    const inactiveUsers = await buildInactiveUsers(allRows, rangeRows, stateId, districtId, users);
+    const filterOptions = await buildScopedFilterOptions(scope, effectiveRegionId, effectiveStateId);
+    const inactiveUsers = await buildInactiveUsers(
+      allRows,
+      rangeRows,
+      effectiveRegionId,
+      effectiveStateId,
+      effectiveDistrictId,
+      users,
+      scope,
+    );
 
     const byState = uniqueByState(rangeRows);
     const byUser = uniqueByUser(rangeRows);
@@ -164,6 +190,7 @@ export async function getUnifiedDashboard(req: Request, res: Response) {
       percentage: userChartTotal ? Math.round((item.uniqueCount / userChartTotal) * 100) : 0,
     }));
 
+    const geographyLeaderboard = geographyLeaderboardFromRows(rangeRows, geoLevel, stateRegionMap);
     const stateLeaderboard = leaderboardFromRows(rangeRows, 'state').map((item) => ({
       rank: item.rank,
       state: item.name,
@@ -184,7 +211,16 @@ export async function getUnifiedDashboard(req: Request, res: Response) {
       success: true,
       data: {
         lastUpdated: new Date().toISOString(),
-        filters: { period, fromDate, toDate, stateId, districtId, users },
+        filters: {
+          period,
+          fromDate,
+          toDate,
+          regionId: effectiveRegionId,
+          stateId: effectiveStateId,
+          districtId: effectiveDistrictId,
+          geoLevel,
+          users,
+        },
         filterOptions,
         summary: {
           totalSubmissions: countUniqueSubmissions(rangeRows),
@@ -202,6 +238,7 @@ export async function getUnifiedDashboard(req: Request, res: Response) {
           activityDistribution: userActivityDistribution,
         },
         topPerformers: {
+          geography: geographyLeaderboard,
           states: stateLeaderboard,
           users: userLeaderboard,
         },
@@ -213,20 +250,20 @@ export async function getUnifiedDashboard(req: Request, res: Response) {
   }
 }
 
-export async function getTodayDashboard(req: Request, res: Response) {
+export async function getTodayDashboard(req: AuthenticatedRequest, res: Response) {
   req.query = { ...req.query, period: 'today' };
   return getUnifiedDashboard(req, res);
 }
 
-export async function getRegionDashboard(req: Request, res: Response) {
+export async function getRegionDashboard(req: AuthenticatedRequest, res: Response) {
   return getUnifiedDashboard(req, res);
 }
 
-export async function getUserDashboard(req: Request, res: Response) {
+export async function getUserDashboard(req: AuthenticatedRequest, res: Response) {
   return getUnifiedDashboard(req, res);
 }
 
-export async function getLeaderboardDashboard(req: Request, res: Response) {
+export async function getLeaderboardDashboard(req: AuthenticatedRequest, res: Response) {
   const period = String(req.query.period || 'today');
   req.query = { ...req.query, period };
   return getUnifiedDashboard(req, res);

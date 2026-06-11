@@ -7,7 +7,7 @@ import SubmissionFiltersBar from '../components/admin/SubmissionFilters';
 import UserDirectoryTab from '../components/admin/UserDirectoryTab';
 import AnalyticsDashboardTab from '../components/admin/AnalyticsDashboardTab';
 import AuditLogsTab from '../components/admin/AuditLogsTab';
-import UserManagementTab from '../components/admin/UserManagementTab';
+import ManagementTab, { type ManagementSubTab } from '../components/admin/ManagementTab';
 import { defaultAuditFilters, defaultFilters, defaultUserManagementFilters } from '../types/admin';
 import type {
   AuditSummaryRecord,
@@ -18,16 +18,17 @@ import type {
   UserManagementFilters,
   AuditFilters,
 } from '../types/admin';
-import { EXCLUDED_ANALYTICS_USERS } from '../constants/excludedAnalyticsUsers';
 import { buildAuditParams, buildFilterParams, buildUserMgmtParams, downloadExport } from '../utils/adminApi';
 
-type MainTab = 'submissions' | 'users' | 'audit';
+type MainTab = 'submissions' | 'management' | 'audit';
 type SubmissionTab = 'directory' | 'kpi';
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [mainTab, setMainTab] = useState<MainTab>('submissions');
   const [submissionTab, setSubmissionTab] = useState<SubmissionTab>('directory');
+  const [managementSubTab, setManagementSubTab] = useState<ManagementSubTab>('users');
 
   const [filters, setFilters] = useState<SubmissionFilters>(defaultFilters);
   const [directoryRecords, setDirectoryRecords] = useState<DirectoryRecord[]>([]);
@@ -49,6 +50,7 @@ const AdminDashboard: React.FC = () => {
   const [loadingAudit, setLoadingAudit] = useState(false);
   const [auditFilters, setAuditFilters] = useState<AuditFilters>(defaultAuditFilters);
 
+  const [submissionUserOptions, setSubmissionUserOptions] = useState<{ name: string; mobileNumber: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const fetchDirectory = useCallback(async () => {
@@ -61,6 +63,9 @@ const AdminDashboard: React.FC = () => {
       const data = res.data.data ?? res.data;
       setDirectoryRecords(data.records || []);
       setDirectoryTotal(data.pagination?.total || 0);
+      if (data.filterOptions?.users) {
+        setSubmissionUserOptions(data.filterOptions.users);
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch directory');
     } finally {
@@ -131,10 +136,11 @@ const AdminDashboard: React.FC = () => {
   }, [mainTab]);
 
   useEffect(() => {
-    if (mainTab !== 'users') return;
+    if (mainTab !== 'management' || managementSubTab !== 'users') return;
     const timer = setTimeout(() => fetchUsers(), 300);
     return () => clearTimeout(timer);
-  }, [userMgmtFilters, mainTab, fetchUsers]);
+  }, [userMgmtFilters, mainTab, managementSubTab, fetchUsers]);
+
   useEffect(() => {
     if (mainTab === 'submissions' && submissionTab === 'directory') {
       fetchDirectory();
@@ -145,17 +151,13 @@ const AdminDashboard: React.FC = () => {
     if (mainTab === 'audit') fetchAuditLogs();
   }, [auditPage]);
 
-  const excludedAnalytics = new Set(EXCLUDED_ANALYTICS_USERS);
-  const userOptions = users
-    .filter((u) => u.role === 'user' && !excludedAnalytics.has(u.mobileNumber))
-    .map((u) => ({ name: u.name, mobileNumber: u.mobileNumber }));
-
   return (
     <AdminLayout
       mainTab={mainTab}
       submissionTab={submissionTab}
       onMainTabChange={setMainTab}
       onSubmissionTabChange={setSubmissionTab}
+      isAdmin={isAdmin}
     >
       {error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-100 rounded-xl text-red-700 flex items-start gap-3 text-xs">
@@ -167,8 +169,8 @@ const AdminDashboard: React.FC = () => {
         <div className="space-y-6">
           {submissionTab === 'directory' && (
             <div>
-              <h2 className="text-2xl font-bold text-slate-800">User Directory</h2>
-              <p className="text-sm text-slate-500 mb-4">Search, filter and export user submissions</p>
+              <h2 className="text-2xl font-bold text-slate-800">Submission Logs</h2>
+              <p className="text-sm text-slate-500 mb-4">VCP profile submissions from salespersons only</p>
             </div>
           )}
 
@@ -176,7 +178,7 @@ const AdminDashboard: React.FC = () => {
             <SubmissionFiltersBar
               filters={filters}
               setFilters={setFilters}
-              users={userOptions}
+              users={submissionUserOptions}
               loading={loadingDirectory}
               downloadMode={downloadMode}
               onDownloadModeChange={setDownloadMode}
@@ -213,17 +215,19 @@ const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {mainTab === 'users' && (
-        <UserManagementTab
+      {isAdmin && mainTab === 'management' && (
+        <ManagementTab
+          subTab={managementSubTab}
+          onSubTabChange={setManagementSubTab}
           users={users}
           mobileNumberOptions={mobileNumberFilterOptions}
-          loading={loadingUsers}
-          filters={userMgmtFilters}
-          onFiltersChange={setUserMgmtFilters}
+          loadingUsers={loadingUsers}
+          userMgmtFilters={userMgmtFilters}
+          onUserMgmtFiltersChange={setUserMgmtFilters}
           currentUserId={user?.id}
-          onRefresh={fetchUsers}
-          onExportCsv={() => downloadExport('/api/internal/users/export-csv', 'users.csv', buildUserMgmtParams(userMgmtFilters))}
-          onExportExcel={() => downloadExport('/api/internal/users/export-excel', 'users.xls', buildUserMgmtParams(userMgmtFilters))}
+          onRefreshUsers={fetchUsers}
+          onExportUsersCsv={() => downloadExport('/api/internal/users/export-csv', 'users.csv', buildUserMgmtParams(userMgmtFilters))}
+          onExportUsersExcel={() => downloadExport('/api/internal/users/export-excel', 'users.xls', buildUserMgmtParams(userMgmtFilters))}
           setError={setError}
         />
       )}

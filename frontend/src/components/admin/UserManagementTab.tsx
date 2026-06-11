@@ -2,14 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Pencil, Eye, EyeOff, FileDown, FileSpreadsheet } from 'lucide-react';
 import api from '../../services/api';
 import SearchableMultiSelect from './SearchableMultiSelect';
-import StateDistrictSelect from '../StateDistrictSelect';
+import RegionStateDistrictSelect from '../RegionStateDistrictSelect';
+import ManagerRegionSelect from '../ManagerRegionSelect';
 import type { DBUser, UserManagementFilters } from '../../types/admin';
 import { defaultUserManagementFilters } from '../../types/admin';
 import { formatDateTime } from '../../utils/adminApi';
 
 const STATUS_OPTIONS = ['Active', 'Inactive'];
-const ROLE_OPTIONS = ['User', 'Admin'];
+const ROLE_OPTIONS = [
+  { value: 'user', label: 'User (Salesperson)' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'manager', label: 'Manager' },
+];
 const MOBILE_REGEX = /^[0-9]{10}$/;
+
+type UserRole = 'user' | 'admin' | 'manager';
 
 interface Props {
   users: DBUser[];
@@ -43,10 +50,12 @@ const UserManagementTab: React.FC<Props> = ({
     name: '',
     mobileNumber: '',
     password: '',
+    regionId: '',
     stateId: '',
     districtId: '',
-    role: 'user' as 'user' | 'admin',
+    role: 'user' as UserRole,
     status: 'active' as 'active' | 'inactive',
+    assignedRegionIds: [] as string[],
   });
   const [fieldErrors, setFieldErrors] = useState<{ name?: string; mobileNumber?: string; geo?: string }>({});
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
@@ -74,7 +83,17 @@ const UserManagementTab: React.FC<Props> = ({
 
   const openCreate = () => {
     setEditingUser(null);
-    setForm({ name: '', mobileNumber: '', password: '', stateId: '', districtId: '', role: 'user', status: 'active' });
+    setForm({
+      name: '',
+      mobileNumber: '',
+      password: '',
+      regionId: '',
+      stateId: '',
+      districtId: '',
+      role: 'user',
+      status: 'active',
+      assignedRegionIds: [],
+    });
     setFieldErrors({});
     setShowForm(true);
   };
@@ -85,10 +104,12 @@ const UserManagementTab: React.FC<Props> = ({
       name: user.name,
       mobileNumber: user.mobileNumber,
       password: '',
+      regionId: '',
       stateId: user.stateId ?? '',
       districtId: user.districtId ?? '',
-      role: user.role as 'user' | 'admin',
+      role: user.role as UserRole,
       status: user.status as 'active' | 'inactive',
+      assignedRegionIds: user.assignedRegionIds ?? [],
     });
     setFieldErrors({});
     setShowForm(true);
@@ -96,16 +117,18 @@ const UserManagementTab: React.FC<Props> = ({
 
   const validateForm = () => {
     const errs: { name?: string; mobileNumber?: string; geo?: string } = {};
-    if (!form.name.trim()) {
-      errs.name = 'Name is required.';
-    }
+    if (!form.name.trim()) errs.name = 'Name is required.';
     if (!form.mobileNumber.trim()) {
       errs.mobileNumber = 'Mobile Number is required.';
     } else if (!MOBILE_REGEX.test(form.mobileNumber.trim())) {
       errs.mobileNumber = 'Please enter a valid 10-digit Mobile Number.';
     }
-    if (!form.stateId || !form.districtId) {
-      errs.geo = 'State and District are required.';
+    if (form.role === 'manager') {
+      if (!form.assignedRegionIds.length) {
+        errs.geo = 'Assign at least one Region for managers.';
+      }
+    } else if (form.role === 'user' && (!form.stateId || !form.districtId)) {
+      errs.geo = 'Region, State and District are required for salespersons.';
     }
     return errs;
   };
@@ -146,15 +169,21 @@ const UserManagementTab: React.FC<Props> = ({
     if (Object.keys(errs).length > 0) return;
 
     try {
+      const payload: Record<string, unknown> = {
+        name: form.name,
+        mobileNumber: form.mobileNumber,
+        role: form.role,
+        status: form.status,
+      };
+
+      if (form.role === 'manager') {
+        payload.assignedRegionIds = form.assignedRegionIds;
+      } else if (form.role === 'user') {
+        payload.stateId = form.stateId;
+        payload.districtId = form.districtId;
+      }
+
       if (editingUser) {
-        const payload: Record<string, string> = {
-          name: form.name,
-          mobileNumber: form.mobileNumber,
-          stateId: form.stateId,
-          districtId: form.districtId,
-          role: form.role,
-          status: form.status,
-        };
         if (form.password) payload.password = form.password;
         await api.put(`/api/internal/users/${editingUser.id}`, payload);
         if (form.password) {
@@ -166,7 +195,8 @@ const UserManagementTab: React.FC<Props> = ({
           setError('Password is required for new users');
           return;
         }
-        const res = await api.post('/api/internal/users', form);
+        payload.password = form.password;
+        const res = await api.post('/api/internal/users', payload);
         const created = res.data.data ?? res.data;
         if (created?.id) {
           setPasswordCache((prev) => ({ ...prev, [created.id]: form.password }));
@@ -195,7 +225,8 @@ const UserManagementTab: React.FC<Props> = ({
     }
   };
 
-  const hasActiveFilters = filters.stateId || filters.districtId || filters.mobileNumbers.length > 0 || filters.role || filters.statuses.length > 0;
+  const hasActiveFilters = filters.regionId || filters.stateId || filters.districtId
+    || filters.mobileNumbers.length > 0 || filters.role || filters.statuses.length > 0;
 
   return (
     <div className="space-y-6">
@@ -205,22 +236,16 @@ const UserManagementTab: React.FC<Props> = ({
         </div>
       )}
 
-      <div className="flex flex-wrap justify-between items-center gap-3">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">User Management</h2>
-          <p className="text-sm text-slate-500">Create, edit and manage database accounts</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={onExportCsv} className="px-3 py-2 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
-            <FileDown className="w-3.5 h-3.5" /> Export CSV
-          </button>
-          <button onClick={onExportExcel} className="px-3 py-2 border border-blue-200 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
-            <FileSpreadsheet className="w-3.5 h-3.5" /> Export Excel
-          </button>
-          <button onClick={openCreate} className="px-3 py-2 bg-humbee-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
-            <Plus className="w-4 h-4" /> Add User
-          </button>
-        </div>
+      <div className="flex flex-wrap justify-end gap-2">
+        <button onClick={onExportCsv} className="px-3 py-2 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
+          <FileDown className="w-3.5 h-3.5" /> Export CSV
+        </button>
+        <button onClick={onExportExcel} className="px-3 py-2 border border-blue-200 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
+          <FileSpreadsheet className="w-3.5 h-3.5" /> Export Excel
+        </button>
+        <button onClick={openCreate} className="px-3 py-2 bg-humbee-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
+          <Plus className="w-4 h-4" /> Add User
+        </button>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4">
@@ -243,24 +268,25 @@ const UserManagementTab: React.FC<Props> = ({
           />
           <div className="min-w-[180px] flex-1">
             <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-              Role
+              Account Type
             </label>
             <select
               value={filters.role}
               onChange={(e) => updateFilters({ role: e.target.value })}
               className="input-style-compact w-full min-h-[42px] rounded-xl"
             >
-              <option value="">All Roles</option>
+              <option value="">All Types</option>
               {ROLE_OPTIONS.map((role) => (
-                <option key={role} value={role.toLowerCase()}>{role}</option>
+                <option key={role.value} value={role.value}>{role.label}</option>
               ))}
             </select>
           </div>
           <div className="min-w-[320px] flex-[2]">
-            <StateDistrictSelect
+            <RegionStateDistrictSelect
+              regionId={filters.regionId}
               stateId={filters.stateId}
               districtId={filters.districtId}
-              onChange={(stateId, districtId) => updateFilters({ stateId, districtId })}
+              onChange={(regionId, stateId, districtId) => updateFilters({ regionId, stateId, districtId })}
             />
           </div>
         </div>
@@ -280,7 +306,7 @@ const UserManagementTab: React.FC<Props> = ({
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm max-w-lg space-y-4">
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm max-w-2xl space-y-4">
           <h4 className="text-sm font-bold text-slate-700">{editingUser ? 'Edit User' : 'New User'}</h4>
           <div>
             <input
@@ -294,9 +320,7 @@ const UserManagementTab: React.FC<Props> = ({
               className={`input-style-compact w-full ${fieldErrors.name ? 'border-red-400' : ''}`}
               required
             />
-            {fieldErrors.name && (
-              <p className="text-xs text-red-600 mt-1">{fieldErrors.name}</p>
-            )}
+            {fieldErrors.name && <p className="text-xs text-red-600 mt-1">{fieldErrors.name}</p>}
           </div>
           <div>
             <input
@@ -311,9 +335,7 @@ const UserManagementTab: React.FC<Props> = ({
               maxLength={10}
               required
             />
-            {fieldErrors.mobileNumber && (
-              <p className="text-xs text-red-600 mt-1">{fieldErrors.mobileNumber}</p>
-            )}
+            {fieldErrors.mobileNumber && <p className="text-xs text-red-600 mt-1">{fieldErrors.mobileNumber}</p>}
           </div>
           <input
             type="password"
@@ -323,22 +345,36 @@ const UserManagementTab: React.FC<Props> = ({
             className="input-style-compact w-full"
             required={!editingUser}
           />
-          <StateDistrictSelect
-            stateId={form.stateId}
-            districtId={form.districtId}
-            onChange={(stateId, districtId) => {
-              setForm({ ...form, stateId, districtId });
-              setFieldErrors((p) => ({ ...p, geo: undefined }));
-            }}
-            required
-          />
-          {fieldErrors.geo && (
-            <p className="text-xs text-red-600">{fieldErrors.geo}</p>
-          )}
-          <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as 'user' | 'admin' })} className="input-style-compact w-full">
-            <option value="user">User</option>
-            <option value="admin">Administrator</option>
+          <select
+            value={form.role}
+            onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
+            className="input-style-compact w-full"
+          >
+            {ROLE_OPTIONS.map((role) => (
+              <option key={role.value} value={role.value}>{role.label}</option>
+            ))}
           </select>
+          {form.role === 'manager' && (
+            <ManagerRegionSelect
+              assignedRegionIds={form.assignedRegionIds}
+              onChange={(assignedRegionIds) => {
+                setForm({ ...form, assignedRegionIds });
+                setFieldErrors((p) => ({ ...p, geo: undefined }));
+              }}
+            />
+          )}
+          {form.role === 'user' && (
+            <RegionStateDistrictSelect
+              regionId={form.regionId}
+              stateId={form.stateId}
+              districtId={form.districtId}
+              onChange={(regionId, stateId, districtId) => {
+                setForm({ ...form, regionId, stateId, districtId });
+                setFieldErrors((p) => ({ ...p, geo: undefined }));
+              }}
+            />
+          )}
+          {fieldErrors.geo && <p className="text-xs text-red-600">{fieldErrors.geo}</p>}
           <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as 'active' | 'inactive' })} className="input-style-compact w-full">
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
@@ -363,11 +399,9 @@ const UserManagementTab: React.FC<Props> = ({
             <thead>
               <tr className="bg-slate-50 text-slate-500">
                 <th className="p-4 text-left">Name</th>
-                <th className="p-4 text-left">User Mobile</th>
+                <th className="p-4 text-left">Mobile</th>
                 <th className="p-4 text-left">Password</th>
-                <th className="p-4 text-left">State</th>
-                <th className="p-4 text-left">District</th>
-                <th className="p-4 text-left">Role</th>
+                <th className="p-4 text-left">Assignment</th>
                 <th className="p-4 text-left">Created At</th>
                 <th className="p-4 text-left">Status</th>
                 <th className="p-4 text-right">Actions</th>
@@ -393,10 +427,12 @@ const UserManagementTab: React.FC<Props> = ({
                       </button>
                     </div>
                   </td>
-                  <td className="p-4 text-slate-600">{u.state}</td>
-                  <td className="p-4 text-slate-600">{u.district}</td>
-                  <td className="p-4">
-                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${u.role === 'admin' ? 'bg-amber-50 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>{u.role}</span>
+                  <td className="p-4 text-slate-600">
+                    {u.role === 'manager'
+                      ? (u.assignedRegionNames?.length ? u.assignedRegionNames.join(', ') : '—')
+                      : u.role === 'admin'
+                        ? 'All regions'
+                        : `${u.state}${u.district ? ` / ${u.district}` : ''}`}
                   </td>
                   <td className="p-4 text-slate-400">{formatDateTime(u.createdAt)}</td>
                   <td className="p-4">

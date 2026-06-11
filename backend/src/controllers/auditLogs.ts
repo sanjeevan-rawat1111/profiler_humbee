@@ -1,8 +1,10 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import prisma from '../prisma/client';
+import { AuthenticatedRequest } from '../middleware/auth';
 import { excludedAnalyticsMobileNumbers } from '../config/excludedAnalyticsUsers';
 import { sendCsv, sendExcel } from '../utils/exportHelpers';
 import { parsePeriodQuery, periodToDateRange } from '../utils/datePeriod';
+import { GeographyScope, resolveRegionStateIds } from '../utils/geographyScope';
 
 type AuditEventRow = {
   id: string;
@@ -20,10 +22,11 @@ function formatStatus(status: string) {
   return status === 'SUCCESS' ? 'Success' : 'Failed';
 }
 
-async function buildAuditWhere(query: Record<string, unknown>) {
+async function buildAuditWhere(query: Record<string, unknown>, scope?: GeographyScope) {
   const user = String(query.user || '').trim();
   const name = String(query.name || '').trim();
   const search = String(query.search || '').trim();
+  const regionId = String(query.regionId || '').trim();
   const stateId = String(query.stateId || '').trim();
   const districtId = String(query.districtId || '').trim();
   const eventType = String(query.eventType || '').trim();
@@ -50,7 +53,18 @@ async function buildAuditWhere(query: Record<string, unknown>) {
     if (identityClauses.length > 1) andClauses.push({ AND: identityClauses });
   }
 
-  if (stateId) {
+  if (regionId) {
+    const regionStateIds = await resolveRegionStateIds(regionId);
+    const regionStates = await prisma.state.findMany({
+      where: { id: { in: regionStateIds } },
+      select: { stateName: true },
+    });
+    if (regionStates.length) {
+      andClauses.push({ state: { in: regionStates.map((s) => s.stateName) } });
+    } else {
+      andClauses.push({ state: '__none__' });
+    }
+  } else if (stateId) {
     const state = await prisma.state.findUnique({ where: { id: stateId } });
     if (state) andClauses.push({ state: state.stateName });
   }
@@ -63,6 +77,18 @@ async function buildAuditWhere(query: Record<string, unknown>) {
     }
   }
   if (eventType) andClauses.push({ eventType });
+
+  if (scope && !scope.unrestricted) {
+    if (!scope.districtIds.length) {
+      andClauses.push({ district: '__none__' });
+    } else {
+      const scopedDistricts = await prisma.district.findMany({
+        where: { id: { in: scope.districtIds } },
+        select: { districtName: true },
+      });
+      andClauses.push({ district: { in: scopedDistricts.map((d) => d.districtName) } });
+    }
+  }
 
   const range = periodToDateRange(query);
   andClauses.push({ createdAt: range });
@@ -132,8 +158,8 @@ function aggregateSummary(events: AuditEventRow[]) {
     });
 }
 
-async function fetchAuditEvents(query: Record<string, unknown>) {
-  const where = await buildAuditWhere(query);
+async function fetchAuditEvents(query: Record<string, unknown>, scope?: GeographyScope) {
+  const where = await buildAuditWhere(query, scope);
   return prisma.auditLog.findMany({
     where,
     orderBy: { createdAt: 'asc' },
@@ -151,12 +177,12 @@ async function fetchAuditEvents(query: Record<string, unknown>) {
   });
 }
 
-export async function getAuditLogs(req: Request, res: Response) {
+export async function getAuditLogs(req: AuthenticatedRequest, res: Response) {
   const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '20'), 10)));
 
   try {
-    const events = await fetchAuditEvents(req.query);
+    const events = await fetchAuditEvents(req.query, req.geographyScope);
     const summary = aggregateSummary(events);
     const total = summary.length;
     const start = (page - 1) * limit;
@@ -175,14 +201,14 @@ export async function getAuditLogs(req: Request, res: Response) {
   }
 }
 
-export async function getAuditLogDetails(req: Request, res: Response) {
+export async function getAuditLogDetails(req: AuthenticatedRequest, res: Response) {
   const userMobile = String(req.params.userMobile || '').trim();
   if (!userMobile) {
     return res.status(400).json({ success: false, message: 'User mobile is required' });
   }
 
   try {
-    const events = await fetchAuditEvents({ ...req.query, user: userMobile });
+    const events = await fetchAuditEvents({ ...req.query, user: userMobile }, req.geographyScope);
     const userEvents = events
       .filter((event) => event.username === userMobile)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -211,13 +237,13 @@ export async function getAuditLogDetails(req: Request, res: Response) {
   }
 }
 
-function buildExportRows(query: Record<string, unknown>) {
-  return fetchAuditEvents(query).then(aggregateSummary);
+function buildExportRows(query: Record<string, unknown>, scope?: GeographyScope) {
+  return fetchAuditEvents(query, scope).then(aggregateSummary);
 }
 
-export async function exportAuditLogsCsv(req: Request, res: Response) {
+export async function exportAuditLogsCsv(req: AuthenticatedRequest, res: Response) {
   try {
-    const rows = await buildExportRows(req.query);
+    const rows = await buildExportRows(req.query, req.geographyScope);
     return sendCsv(
       res,
       'audit-activity-summary.csv',
@@ -237,9 +263,9 @@ export async function exportAuditLogsCsv(req: Request, res: Response) {
   }
 }
 
-export async function exportAuditLogsExcel(req: Request, res: Response) {
+export async function exportAuditLogsExcel(req: AuthenticatedRequest, res: Response) {
   try {
-    const rows = await buildExportRows(req.query);
+    const rows = await buildExportRows(req.query, req.geographyScope);
     return sendExcel(
       res,
       'audit-activity-summary.xls',

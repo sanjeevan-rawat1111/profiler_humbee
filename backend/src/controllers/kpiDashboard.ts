@@ -1,4 +1,6 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthenticatedRequest } from '../middleware/auth';
+import { resolveSubmissionFetchOptions } from '../utils/geographyScope';
 import prisma from '../prisma/client';
 import { excludedAnalyticsMobileNumbers } from '../config/excludedAnalyticsUsers';
 import { sendCsv, sendExcel } from '../utils/exportHelpers';
@@ -47,12 +49,13 @@ function fillDateRangeTrend(rows: SubmissionRow[], range: { gte: Date; lte: Date
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-export async function getKpiDashboard(req: Request, res: Response) {
+export async function getKpiDashboard(req: AuthenticatedRequest, res: Response) {
   const filters = parseFilterQuery(req.query);
   const periodRange = getKpiPeriodRange(filters.period, filters.fromDate, filters.toDate);
 
   try {
-    const allRows = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters));
+    const fetchOptions = await resolveSubmissionFetchOptions(filters, req.geographyScope);
+    const allRows = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters, fetchOptions));
     const periodRows = periodRange
       ? allRows.filter((row) => row.submittedAt >= periodRange.gte && row.submittedAt <= periodRange.lte)
       : allRows;
@@ -170,10 +173,11 @@ export async function getKpiDashboard(req: Request, res: Response) {
   }
 }
 
-export async function exportKpiCsv(req: Request, res: Response) {
+export async function exportKpiCsv(req: AuthenticatedRequest, res: Response) {
   try {
     const filters = parseFilterQuery(req.query);
-    const allRows = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters));
+    const fetchOptions = await resolveSubmissionFetchOptions(filters, req.geographyScope);
+    const allRows = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters, fetchOptions));
     const userMap = uniqueByUser(allRows);
     const rows = Array.from(userMap.entries())
       .map(([mobileNumber, data]) => [data.name, mobileNumber, data.keys.size])
@@ -186,10 +190,11 @@ export async function exportKpiCsv(req: Request, res: Response) {
   }
 }
 
-export async function exportKpiExcel(req: Request, res: Response) {
+export async function exportKpiExcel(req: AuthenticatedRequest, res: Response) {
   try {
     const filters = parseFilterQuery(req.query);
-    const allRows = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters));
+    const fetchOptions = await resolveSubmissionFetchOptions(filters, req.geographyScope);
+    const allRows = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters, fetchOptions));
     const userMap = uniqueByUser(allRows);
     const rows = Array.from(userMap.entries())
       .map(([mobileNumber, data]) => [data.name, mobileNumber, data.keys.size])

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FilterX, FileDown, FileSpreadsheet, X } from 'lucide-react';
 import api from '../../services/api';
 import DatePeriodFilter from './DatePeriodFilter';
-import StateDistrictSelect from '../StateDistrictSelect';
+import RegionStateDistrictSelect from '../RegionStateDistrictSelect';
 import type { AuditActivityDetail, AuditFilters, AuditSummaryRecord } from '../../types/admin';
 import { defaultAuditFilters } from '../../types/admin';
 import { buildAuditParams, formatDateTime } from '../../utils/adminApi';
@@ -97,12 +97,11 @@ const AuditLogsTab: React.FC<Props> = ({
           </select>
         </div>
 
-        <StateDistrictSelect
+        <RegionStateDistrictSelect
+          regionId={filters.regionId}
           stateId={filters.stateId}
           districtId={filters.districtId}
-          onChange={(stateId, districtId) => setFilters((prev) => ({ ...prev, stateId, districtId }))}
-          stateLabel=""
-          districtLabel=""
+          onChange={(regionId, stateId, districtId) => setFilters((prev) => ({ ...prev, regionId, stateId, districtId }))}
         />
 
         <div className="flex flex-wrap justify-between gap-2">

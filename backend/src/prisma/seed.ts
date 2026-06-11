@@ -12,7 +12,7 @@ const DEFAULT_USERS = [
     password: 'Admin1234',
     role: 'admin' as const,
     stateName: 'Delhi',
-    districtName: 'New Delhi',
+    districtName: 'Central Delhi',
   },
   {
     name: 'Demo Officer',
@@ -28,7 +28,7 @@ const DEFAULT_USERS = [
     password: 'Ping@20p95',
     role: 'user' as const,
     stateName: 'Delhi',
-    districtName: 'New Delhi',
+    districtName: 'Central Delhi',
   },
 ];
 

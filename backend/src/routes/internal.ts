@@ -21,10 +21,12 @@ import {
 import {
   getAuditLogs, getAuditLogDetails, exportAuditLogsCsv, exportAuditLogsExcel,
 } from '../controllers/auditLogs';
-import { getStates, getDistrictsByState } from '../controllers/geo';
+import { getRegions as getGeoRegions, getStates, getDistrictsByState } from '../controllers/geo';
+import { getRegions, createRegion, updateRegion, deleteRegion } from '../controllers/region';
 import { adminMiddleware } from '../middleware/admin';
+import { adminOnlyMiddleware } from '../middleware/adminOnly';
 import { validateBody } from '../middleware/validate';
-import { createUserSchema, updateUserSchema } from '../validators/schemas';
+import { createUserSchema, updateUserSchema, regionSchema, updateRegionSchema } from '../validators/schemas';
 import { z } from 'zod';
 
 const router = Router();
@@ -37,18 +39,25 @@ const resetPasswordSchema = z.object({
 router.use(adminMiddleware);
 
 // Geo master
+router.get('/geo/regions', getGeoRegions);
 router.get('/geo/states', getStates);
 router.get('/geo/states/:stateId/districts', getDistrictsByState);
 
-// Users
-router.get('/users', getUsers);
-router.get('/users/:id/password', getUserPassword);
-router.get('/users/export-csv', exportUsersCsv);
-router.get('/users/export-excel', exportUsersExcel);
-router.post('/users', validateBody(createUserSchema), createUser);
-router.put('/users/:id', validateBody(updateUserSchema), updateUser);
-router.post('/users/:id/reset-password', validateBody(resetPasswordSchema), resetUserPassword);
-router.delete('/users/:id', deleteUser);
+// Region management (admin only)
+router.get('/regions', adminOnlyMiddleware, getRegions);
+router.post('/regions', adminOnlyMiddleware, validateBody(regionSchema), createRegion);
+router.put('/regions/:id', adminOnlyMiddleware, validateBody(updateRegionSchema), updateRegion);
+router.delete('/regions/:id', adminOnlyMiddleware, deleteRegion);
+
+// Users (admin only)
+router.get('/users', adminOnlyMiddleware, getUsers);
+router.get('/users/:id/password', adminOnlyMiddleware, getUserPassword);
+router.get('/users/export-csv', adminOnlyMiddleware, exportUsersCsv);
+router.get('/users/export-excel', adminOnlyMiddleware, exportUsersExcel);
+router.post('/users', adminOnlyMiddleware, validateBody(createUserSchema), createUser);
+router.put('/users/:id', adminOnlyMiddleware, validateBody(updateUserSchema), updateUser);
+router.post('/users/:id/reset-password', adminOnlyMiddleware, validateBody(resetPasswordSchema), resetUserPassword);
+router.delete('/users/:id', adminOnlyMiddleware, deleteUser);
 
 // Submission directory
 router.get('/submissions/directory', getSubmissionDirectory);

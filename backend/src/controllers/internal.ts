@@ -1,11 +1,14 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import bcrypt from 'bcrypt';
 import prisma from '../prisma/client';
+import { AuthenticatedRequest } from '../middleware/auth';
 import { excludedAnalyticsMobileNumbers, isExcludedAnalyticsMobile } from '../config/excludedAnalyticsUsers';
 import { sendCsv, sendExcel } from '../utils/exportHelpers';
 import { parseArrayParam } from '../utils/dashboardAnalytics';
 import { resolveGeoIds } from '../data/seedGeoMaster';
 import { userGeoFields } from '../utils/userGeo';
+import { resolveRegionStateIds } from '../utils/geographyScope';
+import { baseSalespersonUserFilter } from '../utils/submissionFilters';
 
 const userListSelect = {
   id: true,
@@ -20,21 +23,51 @@ const userListSelect = {
   status: true,
   createdAt: true,
   updatedAt: true,
+  userRegions: {
+    select: {
+      regionId: true,
+      region: { select: { regionName: true } },
+    },
+  },
 } as const;
 
+function mapUserResponse<T extends {
+  userRegions?: { regionId: string; region: { regionName: string } }[];
+}>(user: T) {
+  const assignedRegionIds = (user.userRegions ?? []).map((entry) => entry.regionId);
+  const assignedRegionNames = (user.userRegions ?? []).map((entry) => entry.region.regionName);
+  const { userRegions, ...rest } = user;
+  return { ...rest, assignedRegionIds, assignedRegionNames };
+}
+
+async function saveUserRegions(userId: string, assignedRegionIds: string[]) {
+  await prisma.userRegion.deleteMany({ where: { userId } });
+  if (!assignedRegionIds.length) return;
+  await prisma.userRegion.createMany({
+    data: assignedRegionIds.map((regionId) => ({ userId, regionId })),
+  });
+}
+
 function parseUserListQuery(query: Record<string, unknown>) {
+  const regionId = String(query.regionId || '').trim();
   const stateId = String(query.stateId || '').trim();
   const districtId = String(query.districtId || '').trim();
   const role = String(query.role || '').trim();
   const mobileNumbers = parseArrayParam(query.mobileNumbers ?? query.users ?? query.user);
   const statuses = parseArrayParam(query.status ?? query.statuses).map((value) => value.toLowerCase());
-  return { stateId, districtId, role, mobileNumbers, statuses };
+  return { regionId, stateId, districtId, role, mobileNumbers, statuses };
 }
 
-function buildUserListWhere(filters: ReturnType<typeof parseUserListQuery>) {
+async function buildUserListWhere(filters: ReturnType<typeof parseUserListQuery>) {
   const where: Record<string, unknown> = {};
-  if (filters.stateId) where.stateId = filters.stateId;
-  if (filters.districtId) where.districtId = filters.districtId;
+  if (filters.districtId) {
+    where.districtId = filters.districtId;
+  } else if (filters.stateId) {
+    where.stateId = filters.stateId;
+  } else if (filters.regionId) {
+    const regionStateIds = await resolveRegionStateIds(filters.regionId);
+    where.stateId = { in: regionStateIds.length ? regionStateIds : ['__none__'] };
+  }
   if (filters.role) where.role = filters.role;
   if (filters.mobileNumbers.length) where.mobileNumber = { in: filters.mobileNumbers };
   if (filters.statuses.length) where.status = { in: filters.statuses };
@@ -47,12 +80,12 @@ async function hashPassword(password: string): Promise<string> {
 
 // ─── USERS ───────────────────────────────────────────────────────────────────
 
-export async function getUsers(req: Request, res: Response) {
+export async function getUsers(req: AuthenticatedRequest, res: Response) {
   const filters = parseUserListQuery(req.query);
   try {
     const [users, allMobileNumbers] = await Promise.all([
       prisma.user.findMany({
-        where: buildUserListWhere(filters),
+        where: await buildUserListWhere(filters),
         select: userListSelect,
         orderBy: { createdAt: 'desc' },
       }),
@@ -64,7 +97,7 @@ export async function getUsers(req: Request, res: Response) {
     return res.status(200).json({
       success: true,
       data: {
-        users,
+        users: users.map(mapUserResponse),
         filterOptions: { mobileNumbers: allMobileNumbers.map((user) => user.mobileNumber) },
       },
     });
@@ -74,12 +107,44 @@ export async function getUsers(req: Request, res: Response) {
   }
 }
 
-export async function createUser(req: Request, res: Response) {
-  const { name, mobileNumber, password, role, status, stateId, districtId } = req.body;
+export async function createUser(req: AuthenticatedRequest, res: Response) {
+  const {
+    name,
+    mobileNumber,
+    password,
+    role,
+    status,
+    stateId,
+    districtId,
+    assignedRegionIds = [],
+  } = req.body;
+  const userRole = role || 'user';
   try {
-    const geo = await resolveGeoIds(stateId, districtId);
-    if (!geo) {
-      return res.status(400).json({ success: false, message: 'Invalid State and District combination.' });
+    let geoData = {
+      stateId: null as string | null,
+      districtId: null as string | null,
+      stateName: '',
+      districtName: '',
+    };
+
+    let regionLabel = 'Admin';
+    if (userRole === 'manager') {
+      const firstRegion = assignedRegionIds[0]
+        ? await prisma.region.findUnique({ where: { id: assignedRegionIds[0] } })
+        : null;
+      regionLabel = firstRegion?.regionName ?? 'Manager';
+    } else if (userRole === 'user') {
+      const geo = await resolveGeoIds(stateId, districtId);
+      if (!geo) {
+        return res.status(400).json({ success: false, message: 'Invalid State and District combination.' });
+      }
+      geoData = {
+        stateId: geo.stateId,
+        districtId: geo.districtId,
+        stateName: geo.stateName,
+        districtName: geo.districtName,
+      };
+      regionLabel = geo.stateName;
     }
 
     const existingMobile = await prisma.user.findUnique({ where: { mobileNumber } });
@@ -92,31 +157,48 @@ export async function createUser(req: Request, res: Response) {
         mobileNumber,
         passwordHash: await hashPassword(password),
         plainPassword: password,
-        role: role || 'user',
-        stateId: geo.stateId,
-        districtId: geo.districtId,
-        state: geo.stateName,
-        district: geo.districtName,
-        ...userGeoFields(geo.stateName),
+        role: userRole,
+        stateId: geoData.stateId,
+        districtId: geoData.districtId,
+        state: geoData.stateName,
+        district: geoData.districtName,
+        ...userGeoFields(regionLabel),
         status: status || 'active',
       },
       select: userListSelect,
     });
-    return res.status(201).json({ success: true, data: user });
+
+    if (userRole === 'manager') {
+      await saveUserRegions(user.id, assignedRegionIds);
+      const refreshed = await prisma.user.findUnique({ where: { id: user.id }, select: userListSelect });
+      return res.status(201).json({ success: true, data: mapUserResponse(refreshed!) });
+    }
+
+    return res.status(201).json({ success: true, data: mapUserResponse(user) });
   } catch (error) {
     console.error('createUser error:', error);
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
 
-export async function updateUser(req: Request, res: Response) {
+export async function updateUser(req: AuthenticatedRequest, res: Response) {
   const { id } = req.params;
-  const { name, mobileNumber, password, role, status, stateId, districtId } = req.body;
+  const {
+    name,
+    mobileNumber,
+    password,
+    role,
+    status,
+    stateId,
+    districtId,
+    assignedRegionIds,
+  } = req.body;
   try {
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    const nextRole = role || existing.role;
     const updateData: Record<string, unknown> = {};
     if (name) updateData.name = name;
     if (mobileNumber) {
@@ -130,7 +212,22 @@ export async function updateUser(req: Request, res: Response) {
     }
     if (role) updateData.role = role;
     if (status) updateData.status = status;
-    if (stateId !== undefined || districtId !== undefined) {
+
+    if (nextRole === 'manager') {
+      if (assignedRegionIds !== undefined) {
+        await saveUserRegions(id, assignedRegionIds);
+        const firstRegion = assignedRegionIds[0]
+          ? await prisma.region.findUnique({ where: { id: assignedRegionIds[0] } })
+          : null;
+        Object.assign(updateData, {
+          stateId: null,
+          districtId: null,
+          state: '',
+          district: '',
+          ...userGeoFields(firstRegion?.regionName ?? 'Manager'),
+        });
+      }
+    } else if (nextRole === 'user' && (stateId !== undefined || districtId !== undefined)) {
       const geo = await resolveGeoIds(
         stateId ?? existing.stateId ?? '',
         districtId ?? existing.districtId ?? '',
@@ -145,6 +242,9 @@ export async function updateUser(req: Request, res: Response) {
         district: geo.districtName,
         ...userGeoFields(geo.stateName),
       });
+      await prisma.userRegion.deleteMany({ where: { userId: id } });
+    } else if (nextRole === 'admin') {
+      await prisma.userRegion.deleteMany({ where: { userId: id } });
     }
 
     const updated = await prisma.user.update({
@@ -152,14 +252,14 @@ export async function updateUser(req: Request, res: Response) {
       data: updateData,
       select: userListSelect,
     });
-    return res.status(200).json({ success: true, data: updated });
+    return res.status(200).json({ success: true, data: mapUserResponse(updated) });
   } catch (error) {
     console.error('updateUser error:', error);
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 }
 
-export async function resetUserPassword(req: Request, res: Response) {
+export async function resetUserPassword(req: AuthenticatedRequest, res: Response) {
   const { id } = req.params;
   const { password } = req.body;
   try {
@@ -181,7 +281,7 @@ export async function resetUserPassword(req: Request, res: Response) {
   }
 }
 
-export async function getUserPassword(req: Request, res: Response) {
+export async function getUserPassword(req: AuthenticatedRequest, res: Response) {
   const { id } = req.params;
   try {
     const user = await prisma.user.findUnique({
@@ -201,11 +301,11 @@ export async function getUserPassword(req: Request, res: Response) {
   }
 }
 
-export async function exportUsersCsv(req: Request, res: Response) {
+export async function exportUsersCsv(req: AuthenticatedRequest, res: Response) {
   const filters = parseUserListQuery(req.query);
   try {
     const users = await prisma.user.findMany({
-      where: buildUserListWhere(filters),
+      where: await buildUserListWhere(filters),
       select: { name: true, mobileNumber: true, state: true, district: true, role: true, status: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
@@ -221,11 +321,11 @@ export async function exportUsersCsv(req: Request, res: Response) {
   }
 }
 
-export async function exportUsersExcel(req: Request, res: Response) {
+export async function exportUsersExcel(req: AuthenticatedRequest, res: Response) {
   const filters = parseUserListQuery(req.query);
   try {
     const users = await prisma.user.findMany({
-      where: buildUserListWhere(filters),
+      where: await buildUserListWhere(filters),
       select: { name: true, mobileNumber: true, state: true, district: true, role: true, status: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
@@ -241,7 +341,7 @@ export async function exportUsersExcel(req: Request, res: Response) {
   }
 }
 
-export async function deleteUser(req: Request, res: Response) {
+export async function deleteUser(req: AuthenticatedRequest, res: Response) {
   const { id } = req.params;
   try {
     const existing = await prisma.user.findUnique({ where: { id } });
@@ -301,7 +401,7 @@ function toDateKey(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
-export async function getSubmissions(req: Request, res: Response) {
+export async function getSubmissions(req: AuthenticatedRequest, res: Response) {
   const { sapCode, mobile, mobileNumber, date, user, sort = 'desc' } = req.query;
   const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '20'), 10)));
@@ -317,11 +417,11 @@ export async function getSubmissions(req: Request, res: Response) {
     where.user = user
       ? {
           AND: [
+            baseSalespersonUserFilter(),
             { mobileNumber: { contains: String(user) } },
-            { mobileNumber: { notIn: excludedAnalyticsMobileNumbers() } },
           ],
         }
-      : { mobileNumber: { notIn: excludedAnalyticsMobileNumbers() } };
+      : baseSalespersonUserFilter();
 
     const [total, submissions] = await prisma.$transaction([
       prisma.submission.count({ where }),
@@ -353,7 +453,7 @@ export async function getSubmissions(req: Request, res: Response) {
   }
 }
 
-export async function getSubmissionKpis(req: Request, res: Response) {
+export async function getSubmissionKpis(req: AuthenticatedRequest, res: Response) {
   const {
     sapCode,
     mobile,
@@ -483,7 +583,7 @@ export async function getSubmissionKpis(req: Request, res: Response) {
   }
 }
 
-export async function exportSubmissions(req: Request, res: Response) {
+export async function exportSubmissions(req: AuthenticatedRequest, res: Response) {
   const { sapCode, mobile, mobileNumber, date, user } = req.query;
   const mobileFilter = (mobile || mobileNumber) as string | undefined;
 
@@ -496,11 +596,11 @@ export async function exportSubmissions(req: Request, res: Response) {
     where.user = user
       ? {
           AND: [
+            baseSalespersonUserFilter(),
             { mobileNumber: { contains: String(user) } },
-            { mobileNumber: { notIn: excludedAnalyticsMobileNumbers() } },
           ],
         }
-      : { mobileNumber: { notIn: excludedAnalyticsMobileNumbers() } };
+      : baseSalespersonUserFilter();
 
     const submissions = await prisma.submission.findMany({
       where,

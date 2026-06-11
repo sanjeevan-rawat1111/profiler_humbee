@@ -1,8 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken, TokenPayload } from '../utils/jwt';
+import type { GeographyScope } from '../utils/geographyScope';
 
 export interface AuthenticatedRequest extends Request {
   user?: TokenPayload;
+  geographyScope?: GeographyScope;
 }
 
 export function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {

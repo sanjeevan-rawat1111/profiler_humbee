@@ -27,15 +27,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  const isAdmin = user?.role === 'admin';
+  const isInternalUser = user?.role === 'admin' || user?.role === 'manager';
 
-  // Admin attempting a user-only route → send to /admin
-  if (userOnly && isAdmin) {
+  if (userOnly && isInternalUser) {
     return <Navigate to="/admin" replace />;
   }
 
-  // Non-admin attempting an admin-only route → send to /submission
-  if (adminOnly && !isAdmin) {
+  if (adminOnly && !isInternalUser) {
     return <Navigate to="/submission" replace />;
   }
 

@@ -23,6 +23,7 @@ export function buildFilterParams(filters: SubmissionFilters, extra: Record<stri
   };
   if (filters.search) params.search = filters.search;
   if (filters.user) params.user = filters.user;
+  if (filters.regionId) params.regionId = filters.regionId;
   if (filters.stateId) params.stateId = filters.stateId;
   if (filters.districtId) params.districtId = filters.districtId;
   if (filters.sapCode) params.sapCode = filters.sapCode;
@@ -38,6 +39,7 @@ export function buildAuditParams(filters: AuditFilters, extra: Record<string, st
   if (filters.search) params.search = filters.search;
   if (filters.name) params.name = filters.name;
   if (filters.user) params.user = filters.user;
+  if (filters.regionId) params.regionId = filters.regionId;
   if (filters.stateId) params.stateId = filters.stateId;
   if (filters.districtId) params.districtId = filters.districtId;
   if (filters.eventType) params.eventType = filters.eventType;
@@ -62,14 +64,17 @@ export async function downloadExport(url: string, filename: string, params: Reco
 
 export function buildDashboardParams(filters: GlobalDashboardFilters) {
   const params: Record<string, string> = buildPeriodParams(filters.period, filters.fromDate, filters.toDate);
+  if (filters.regionId) params.regionId = filters.regionId;
   if (filters.stateId) params.stateId = filters.stateId;
   if (filters.districtId) params.districtId = filters.districtId;
+  if (filters.geoLevel) params.geoLevel = filters.geoLevel;
   if (filters.users.length) params.users = filters.users.join(',');
   return params;
 }
 
 export function buildUserMgmtParams(filters: UserManagementFilters) {
   const params: Record<string, string> = {};
+  if (filters.regionId) params.regionId = filters.regionId;
   if (filters.stateId) params.stateId = filters.stateId;
   if (filters.districtId) params.districtId = filters.districtId;
   if (filters.role) params.role = filters.role;
