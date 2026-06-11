@@ -98,13 +98,14 @@ const AnalyticsDashboardTab: React.FC = () => {
   );
 
   const userListItems = useMemo(
-    () => (data?.users.topChart ?? []).map((item) => ({ name: item.mobileNumber, count: item.uniqueCount })),
+    () => (data?.users.topChart ?? []).map((item) => ({ name: item.name, count: item.uniqueCount })),
     [data],
   );
 
   const inactiveListItems = useMemo(
     () => (data?.inactiveUsers ?? []).map((item) => ({
-      name: item.mobileNumber,
+      name: item.name,
+      mobileNumber: item.mobileNumber,
       count: 0,
       region: item.region,
       lastSubmission: item.lastSubmission,
@@ -242,7 +243,7 @@ const AnalyticsDashboardTab: React.FC = () => {
               <ChartPanel title="Top Users Ranking" className="min-h-[420px]">
                 <ScrollableBarChart
                   data={data.topPerformers.users.map((item) => ({
-                    label: item.mobileNumber,
+                    label: item.name,
                     value: item.totalSubmissions,
                   }))}
                   color="#8b5cf6"
@@ -296,7 +297,7 @@ const AnalyticsDashboardTab: React.FC = () => {
               <RankedListPanel
                 title="Top Users by Submission Count"
                 items={userListItems}
-                nameLabel="Mobile Number"
+                nameLabel="Name"
                 countLabel="Submissions"
               />
               <ChartPanel title="User Activity Distribution">
@@ -305,7 +306,7 @@ const AnalyticsDashboardTab: React.FC = () => {
                     <Pie
                       data={data.users.activityDistribution.slice(0, 10)}
                       dataKey="uniqueCount"
-                      nameKey="mobileNumber"
+                      nameKey="name"
                       cx="50%"
                       cy="50%"
                       innerRadius={55}
@@ -319,7 +320,7 @@ const AnalyticsDashboardTab: React.FC = () => {
                     <Tooltip
                       formatter={(value, _name, props) => [
                         `${formatCount(value)} (${formatCount((props?.payload as { percentage?: number })?.percentage)}%)`,
-                        (props?.payload as { mobileNumber?: string })?.mobileNumber ?? '',
+                        (props?.payload as { name?: string; mobileNumber?: string })?.name ?? '',
                       ]}
                     />
                     <Legend wrapperStyle={{ fontSize: 10 }} />

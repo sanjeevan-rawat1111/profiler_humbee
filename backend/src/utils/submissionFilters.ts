@@ -1,4 +1,5 @@
 import { isExcludedAnalyticsMobile } from '../config/excludedAnalyticsUsers';
+import { normalizePeriod, resolvePeriodRange } from './datePeriod';
 
 export type SubmissionRow = {
   id: string;
@@ -6,7 +7,7 @@ export type SubmissionRow = {
   mobileNumber: string;
   submittedAt: Date;
   userId: string;
-  user: { mobileNumber: string; role: string; region: string } | null;
+  user: { name: string; mobileNumber: string; role: string; region: string } | null;
 };
 
 export function isAnalyticsUser(row: SubmissionRow) {
@@ -40,13 +41,17 @@ export function parseFilterQuery(query: Record<string, unknown>) {
   const date = String(query.date || '').trim();
   const fromDate = String(query.fromDate || query.customStart || '').trim();
   const toDate = String(query.toDate || query.customEnd || '').trim();
-  const period = String(query.period || '7');
+  const period = normalizePeriod(String(query.period || 'week'));
   const rankingSort = String(query.rankingSort || 'desc') === 'asc' ? 'asc' : 'desc';
 
   return { search, user, region, sapCode, mobileNumber, singleDay, date, fromDate, toDate, period, rankingSort };
 }
 
 export function buildDateRange(filters: ReturnType<typeof parseFilterQuery>) {
+  if (filters.period) {
+    return resolvePeriodRange(filters.period, filters.fromDate, filters.toDate);
+  }
+
   if (filters.singleDay && filters.date) {
     const d = new Date(filters.date);
     if (isNaN(d.getTime())) return undefined;
@@ -57,7 +62,7 @@ export function buildDateRange(filters: ReturnType<typeof parseFilterQuery>) {
     return { gte: start, lte: end };
   }
 
-  if (!filters.singleDay && (filters.fromDate || filters.toDate)) {
+  if (filters.fromDate || filters.toDate) {
     const start = filters.fromDate ? new Date(filters.fromDate) : null;
     const end = filters.toDate ? new Date(filters.toDate) : null;
     if (!start && !end) return undefined;
@@ -68,34 +73,11 @@ export function buildDateRange(filters: ReturnType<typeof parseFilterQuery>) {
     return { gte: rangeStart, lte: rangeEnd };
   }
 
-  return undefined;
+  return resolvePeriodRange('week');
 }
 
 export function getKpiPeriodRange(period: string, fromDate?: string, toDate?: string) {
-  const now = new Date();
-  const end = new Date(now);
-  end.setHours(23, 59, 59, 999);
-
-  if (period === 'today') {
-    const start = new Date(now);
-    start.setHours(0, 0, 0, 0);
-    return { gte: start, lte: end };
-  }
-
-  if (period === 'custom' && fromDate && toDate) {
-    const start = new Date(fromDate);
-    const customEnd = new Date(toDate);
-    if (isNaN(start.getTime()) || isNaN(customEnd.getTime())) return undefined;
-    start.setHours(0, 0, 0, 0);
-    customEnd.setHours(23, 59, 59, 999);
-    return { gte: start, lte: customEnd };
-  }
-
-  const days = period === '30' ? 30 : 7;
-  const start = new Date(end);
-  start.setDate(start.getDate() - (days - 1));
-  start.setHours(0, 0, 0, 0);
-  return { gte: start, lte: end };
+  return resolvePeriodRange(normalizePeriod(period), fromDate, toDate);
 }
 
 export function buildSubmissionWhere(filters: ReturnType<typeof parseFilterQuery>) {
@@ -104,7 +86,12 @@ export function buildSubmissionWhere(filters: ReturnType<typeof parseFilterQuery
   if (filters.mobileNumber) where.mobileNumber = { contains: filters.mobileNumber };
   if (filters.user || filters.region) {
     const userFilter: Record<string, unknown> = {};
-    if (filters.user) userFilter.mobileNumber = { contains: filters.user };
+    if (filters.user) {
+      userFilter.OR = [
+        { mobileNumber: { contains: filters.user } },
+        { name: { contains: filters.user, mode: 'insensitive' } },
+      ];
+    }
     if (filters.region) userFilter.region = { contains: filters.region };
     where.user = userFilter;
   }
@@ -117,6 +104,7 @@ export function buildSubmissionWhere(filters: ReturnType<typeof parseFilterQuery
       { sapCode: { contains: filters.search } },
       { mobileNumber: { contains: filters.search } },
       { user: { mobileNumber: { contains: filters.search } } },
+      { user: { name: { contains: filters.search, mode: 'insensitive' } } },
       { user: { region: { contains: filters.search } } },
     ];
   }
@@ -134,7 +122,7 @@ export async function fetchFilteredSubmissions(prisma: any, filters: ReturnType<
       mobileNumber: true,
       submittedAt: true,
       userId: true,
-      user: { select: { mobileNumber: true, role: true, region: true } },
+      user: { select: { name: true, mobileNumber: true, role: true, region: true } },
     },
     orderBy: { submittedAt: 'desc' },
   }) as Promise<SubmissionRow[]>;

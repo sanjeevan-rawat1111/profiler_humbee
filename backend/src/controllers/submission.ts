@@ -73,7 +73,7 @@ export async function createSubmission(req: AuthenticatedRequest, res: Response)
     if (!pwaUrl) {
       return res.status(502).json({
         success: false,
-        message: 'Could not extract PWA URL from API response',
+        message: 'User not found',
         data: responseData,
       });
     }

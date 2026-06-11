@@ -1,13 +1,13 @@
 import React from 'react';
 import { Search, FilterX, RefreshCw, FileSpreadsheet, FileDown } from 'lucide-react';
+import DatePeriodFilter from './DatePeriodFilter';
 import type { DirectoryDownloadMode, SubmissionFilters as Filters } from '../../types/admin';
 
 interface Props {
   filters: Filters;
   setFilters: React.Dispatch<React.SetStateAction<Filters>>;
-  users: string[];
+  users: { name: string; mobileNumber: string }[];
   loading?: boolean;
-  showPeriod?: boolean;
   downloadMode?: DirectoryDownloadMode;
   onDownloadModeChange?: (mode: DirectoryDownloadMode) => void;
   onClear: () => void;
@@ -21,7 +21,6 @@ const SubmissionFiltersBar: React.FC<Props> = ({
   setFilters,
   users,
   loading,
-  showPeriod,
   downloadMode = 'normal',
   onDownloadModeChange,
   onClear,
@@ -35,11 +34,17 @@ const SubmissionFiltersBar: React.FC<Props> = ({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm space-y-4">
+      <DatePeriodFilter
+        value={{ period: filters.period, fromDate: filters.fromDate, toDate: filters.toDate }}
+        onChange={(value) => setFilters((prev) => ({ ...prev, ...value }))}
+        name="directoryPeriod"
+      />
+
       <div className="input-wrapper">
         <Search className="input-wrapper-icon w-4 h-4 text-slate-400" />
         <input
           type="text"
-          placeholder="Search by user mobile, VCP mobile, region, SAP code..."
+          placeholder="Search by name, user mobile, VCP mobile, region, SAP code..."
           value={filters.search}
           onChange={(e) => update('search', e.target.value)}
           className="input-style-compact"
@@ -55,8 +60,8 @@ const SubmissionFiltersBar: React.FC<Props> = ({
           title="User Mobile Number (Officer)"
         >
           <option value="">All Officers</option>
-          {users.map((mobile) => (
-            <option key={mobile} value={mobile}>{mobile}</option>
+          {users.map((officer) => (
+            <option key={officer.mobileNumber} value={officer.mobileNumber}>{officer.name}</option>
           ))}
         </select>
         <input
@@ -80,64 +85,6 @@ const SubmissionFiltersBar: React.FC<Props> = ({
           onChange={(e) => update('mobileNumber', e.target.value)}
           className="input-style-compact"
         />
-        <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 px-1">
-          <input
-            type="checkbox"
-            checked={filters.singleDay}
-            onChange={(e) => update('singleDay', e.target.checked)}
-            className="rounded border-slate-300"
-          />
-          Single Day Search
-        </label>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filters.singleDay ? (
-          <input
-            type="date"
-            value={filters.date}
-            onChange={(e) => update('date', e.target.value)}
-            className="input-style-compact"
-          />
-        ) : (
-          <>
-            <input
-              type="date"
-              value={filters.fromDate}
-              onChange={(e) => update('fromDate', e.target.value)}
-              className="input-style-compact"
-              placeholder="From Date"
-            />
-            <input
-              type="date"
-              value={filters.toDate}
-              onChange={(e) => update('toDate', e.target.value)}
-              className="input-style-compact"
-              placeholder="To Date"
-            />
-          </>
-        )}
-
-        {showPeriod && (
-          <div className="flex flex-wrap gap-2 items-center">
-            {[
-              { value: 'today', label: 'Today' },
-              { value: '7', label: '7 Days' },
-              { value: '30', label: '30 Days' },
-              { value: 'custom', label: 'Custom' },
-            ].map((opt) => (
-              <label key={opt.value} className="flex items-center gap-1 text-xs font-semibold text-slate-600 cursor-pointer">
-                <input
-                  type="radio"
-                  name="kpiPeriod"
-                  checked={filters.period === opt.value}
-                  onChange={() => update('period', opt.value as Filters['period'])}
-                />
-                {opt.label}
-              </label>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="flex flex-wrap justify-between gap-2 pt-1">

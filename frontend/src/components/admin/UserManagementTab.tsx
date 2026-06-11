@@ -39,13 +39,14 @@ const UserManagementTab: React.FC<Props> = ({
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<DBUser | null>(null);
   const [form, setForm] = useState({
+    name: '',
     mobileNumber: '',
     password: '',
     region: '',
     role: 'user' as 'user' | 'admin',
     status: 'active' as 'active' | 'inactive',
   });
-  const [fieldErrors, setFieldErrors] = useState<{ mobileNumber?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; mobileNumber?: string }>({});
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [passwordCache, setPasswordCache] = useState<Record<string, string>>({});
 
@@ -71,7 +72,7 @@ const UserManagementTab: React.FC<Props> = ({
 
   const openCreate = () => {
     setEditingUser(null);
-    setForm({ mobileNumber: '', password: '', region: '', role: 'user', status: 'active' });
+    setForm({ name: '', mobileNumber: '', password: '', region: '', role: 'user', status: 'active' });
     setFieldErrors({});
     setShowForm(true);
   };
@@ -79,6 +80,7 @@ const UserManagementTab: React.FC<Props> = ({
   const openEdit = (user: DBUser) => {
     setEditingUser(user);
     setForm({
+      name: user.name,
       mobileNumber: user.mobileNumber,
       password: '',
       region: user.region,
@@ -90,7 +92,10 @@ const UserManagementTab: React.FC<Props> = ({
   };
 
   const validateForm = () => {
-    const errs: { mobileNumber?: string } = {};
+    const errs: { name?: string; mobileNumber?: string } = {};
+    if (!form.name.trim()) {
+      errs.name = 'Name is required.';
+    }
     if (!form.mobileNumber.trim()) {
       errs.mobileNumber = 'Mobile Number is required.';
     } else if (!MOBILE_REGEX.test(form.mobileNumber.trim())) {
@@ -137,6 +142,7 @@ const UserManagementTab: React.FC<Props> = ({
     try {
       if (editingUser) {
         const payload: Record<string, string> = {
+          name: form.name,
           mobileNumber: form.mobileNumber,
           region: form.region,
           role: form.role,
@@ -276,6 +282,22 @@ const UserManagementTab: React.FC<Props> = ({
           <h4 className="text-sm font-bold text-slate-700">{editingUser ? 'Edit User' : 'New User'}</h4>
           <div>
             <input
+              type="text"
+              placeholder="Full Name"
+              value={form.name}
+              onChange={(e) => {
+                setForm({ ...form, name: e.target.value });
+                setFieldErrors((p) => ({ ...p, name: undefined }));
+              }}
+              className={`input-style-compact w-full ${fieldErrors.name ? 'border-red-400' : ''}`}
+              required
+            />
+            {fieldErrors.name && (
+              <p className="text-xs text-red-600 mt-1">{fieldErrors.name}</p>
+            )}
+          </div>
+          <div>
+            <input
               type="tel"
               placeholder="Mobile Number (10 digits)"
               value={form.mobileNumber}
@@ -334,7 +356,8 @@ const UserManagementTab: React.FC<Props> = ({
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-slate-50 text-slate-500">
-                <th className="p-4 text-left">Mobile Number</th>
+                <th className="p-4 text-left">Name</th>
+                <th className="p-4 text-left">User Mobile</th>
                 <th className="p-4 text-left">Password</th>
                 <th className="p-4 text-left">Region</th>
                 <th className="p-4 text-left">Role</th>
@@ -346,6 +369,7 @@ const UserManagementTab: React.FC<Props> = ({
             <tbody className="divide-y divide-slate-100">
               {users.map((u) => (
                 <tr key={u.id}>
+                  <td className="p-4 font-bold text-slate-800">{u.name}</td>
                   <td className="p-4 font-mono font-bold text-slate-800">{u.mobileNumber}</td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">

@@ -19,7 +19,7 @@ import {
   getLeaderboardDashboard,
 } from '../controllers/dashboardAnalytics';
 import {
-  getAuditLogs, exportAuditLogsCsv, exportAuditLogsExcel,
+  getAuditLogs, getAuditLogDetails, exportAuditLogsCsv, exportAuditLogsExcel,
 } from '../controllers/auditLogs';
 import { adminMiddleware } from '../middleware/admin';
 import { validateBody } from '../middleware/validate';
@@ -69,8 +69,9 @@ router.get('/dashboard/users', getUserDashboard);
 router.get('/dashboard/leaderboard', getLeaderboardDashboard);
 
 // Audit logs
-router.get('/audit-logs', getAuditLogs);
 router.get('/audit-logs/export-csv', exportAuditLogsCsv);
 router.get('/audit-logs/export-excel', exportAuditLogsExcel);
+router.get('/audit-logs/:userMobile/activity', getAuditLogDetails);
+router.get('/audit-logs', getAuditLogs);
 
 export default router;

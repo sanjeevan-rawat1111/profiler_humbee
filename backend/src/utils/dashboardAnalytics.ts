@@ -46,12 +46,12 @@ export function rowsInRange(rows: SubmissionRow[], range: { gte: Date; lte: Date
 }
 
 export function uniqueByUser(rows: SubmissionRow[]) {
-  const map = new Map<string, { region: string; keys: Set<string>; lastAt: Date }>();
+  const map = new Map<string, { name: string; region: string; keys: Set<string>; lastAt: Date }>();
   rows.forEach((row) => {
     if (!row.user) return;
     const mobileNumber = row.user.mobileNumber;
     if (!map.has(mobileNumber)) {
-      map.set(mobileNumber, { region: row.user.region, keys: new Set(), lastAt: row.submittedAt });
+      map.set(mobileNumber, { name: row.user.name, region: row.user.region, keys: new Set(), lastAt: row.submittedAt });
     }
     const entry = map.get(mobileNumber)!;
     entry.keys.add(uniqueSubmissionKey(row));
@@ -215,7 +215,7 @@ export function leaderboardFromRows(rows: SubmissionRow[], mode: 'region' | 'use
   }
   const byUser = uniqueByUser(rows);
   return Array.from(byUser.entries())
-    .map(([mobileNumber, data]) => ({ name: mobileNumber, totalSubmissions: data.keys.size }))
+    .map(([mobileNumber, data]) => ({ name: data.name, mobileNumber, totalSubmissions: data.keys.size }))
     .sort((a, b) => b.totalSubmissions - a.totalSubmissions)
     .map((item, index) => ({ rank: index + 1, ...item }));
 }

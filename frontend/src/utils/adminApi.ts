@@ -1,21 +1,45 @@
-import type { SubmissionFilters, GlobalDashboardFilters, UserManagementFilters } from '../types/admin';
+import type {
+  SubmissionFilters,
+  GlobalDashboardFilters,
+  UserManagementFilters,
+  AuditFilters,
+  DashboardPeriod,
+} from '../types/admin';
 import api from '../services/api';
 
+export function buildPeriodParams(period: DashboardPeriod, fromDate: string, toDate: string) {
+  const params: Record<string, string> = { period };
+  if (period === 'custom') {
+    if (fromDate) params.fromDate = fromDate;
+    if (toDate) params.toDate = toDate;
+  }
+  return params;
+}
+
 export function buildFilterParams(filters: SubmissionFilters, extra: Record<string, string | number> = {}) {
-  const params: Record<string, string | number> = { ...extra };
+  const params: Record<string, string | number> = {
+    ...buildPeriodParams(filters.period, filters.fromDate, filters.toDate),
+    ...extra,
+  };
   if (filters.search) params.search = filters.search;
   if (filters.user) params.user = filters.user;
   if (filters.region) params.region = filters.region;
   if (filters.sapCode) params.sapCode = filters.sapCode;
   if (filters.mobileNumber) params.mobileNumber = filters.mobileNumber;
-  if (filters.singleDay) {
-    params.singleDay = 'true';
-    if (filters.date) params.date = filters.date;
-  } else {
-    if (filters.fromDate) params.fromDate = filters.fromDate;
-    if (filters.toDate) params.toDate = filters.toDate;
-  }
-  if (filters.period) params.period = filters.period;
+  return params;
+}
+
+export function buildAuditParams(filters: AuditFilters, extra: Record<string, string | number> = {}) {
+  const params: Record<string, string | number> = {
+    ...buildPeriodParams(filters.period, filters.fromDate, filters.toDate),
+    ...extra,
+  };
+  if (filters.search) params.search = filters.search;
+  if (filters.name) params.name = filters.name;
+  if (filters.user) params.user = filters.user;
+  if (filters.state) params.state = filters.state;
+  if (filters.district) params.district = filters.district;
+  if (filters.eventType) params.eventType = filters.eventType;
   return params;
 }
 
@@ -36,14 +60,7 @@ export async function downloadExport(url: string, filename: string, params: Reco
 }
 
 export function buildDashboardParams(filters: GlobalDashboardFilters) {
-  const params: Record<string, string> = { period: filters.period };
-  if (filters.period === 'custom') {
-    if (filters.fromDate) params.fromDate = filters.fromDate;
-    if (filters.toDate) params.toDate = filters.toDate;
-  }
-  if (filters.regions.length) params.regions = filters.regions.join(',');
-  if (filters.users.length) params.users = filters.users.join(',');
-  return params;
+  return buildPeriodParams(filters.period, filters.fromDate, filters.toDate);
 }
 
 export function buildUserMgmtParams(filters: UserManagementFilters) {

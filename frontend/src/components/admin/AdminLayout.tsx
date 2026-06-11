@@ -88,7 +88,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
         </nav>
 
         <div className="p-4 border-t border-slate-100 shrink-0 bg-white">
-          <div className="text-xs font-bold text-slate-700 mb-1">{user?.mobileNumber}</div>
+          <div className="text-xs font-bold text-slate-700 mb-1">{user?.name}</div>
+          <div className="text-[10px] text-slate-500 font-mono mb-0.5">{user?.mobileNumber}</div>
           <div className="text-[10px] text-slate-400 uppercase mb-3">{user?.role}</div>
           <button
             onClick={logout}

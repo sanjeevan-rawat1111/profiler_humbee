@@ -4,6 +4,7 @@ import { isExcludedAnalyticsMobile } from '../config/excludedAnalyticsUsers';
 export async function recordAuditLog(params: {
   userId?: string | null;
   username: string;
+  name?: string | null;
   region?: string | null;
   eventType: 'LOGIN' | 'LOGOUT';
   status: 'SUCCESS' | 'FAIL';
@@ -16,6 +17,7 @@ export async function recordAuditLog(params: {
       data: {
         userId: params.userId ?? null,
         username: params.username,
+        name: params.name ?? null,
         region: params.region ?? null,
         eventType: params.eventType,
         status: params.status,

@@ -3,6 +3,7 @@ import api from '../services/api';
 
 interface User {
   id: string;
+  name: string;
   mobileNumber: string;
   role: string;
   createdAt: string;

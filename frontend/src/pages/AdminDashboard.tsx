@@ -8,17 +8,18 @@ import UserDirectoryTab from '../components/admin/UserDirectoryTab';
 import AnalyticsDashboardTab from '../components/admin/AnalyticsDashboardTab';
 import AuditLogsTab from '../components/admin/AuditLogsTab';
 import UserManagementTab from '../components/admin/UserManagementTab';
-import { defaultFilters, defaultUserManagementFilters } from '../types/admin';
+import { defaultAuditFilters, defaultFilters, defaultUserManagementFilters } from '../types/admin';
 import type {
+  AuditSummaryRecord,
   DirectoryDownloadMode,
   SubmissionFilters,
   DirectoryRecord,
-  AuditLogRecord,
   DBUser,
   UserManagementFilters,
+  AuditFilters,
 } from '../types/admin';
 import { EXCLUDED_ANALYTICS_USERS } from '../constants/excludedAnalyticsUsers';
-import { buildFilterParams, buildUserMgmtParams, downloadExport } from '../utils/adminApi';
+import { buildAuditParams, buildFilterParams, buildUserMgmtParams, downloadExport } from '../utils/adminApi';
 
 type MainTab = 'submissions' | 'users' | 'audit';
 type SubmissionTab = 'directory' | 'kpi';
@@ -42,11 +43,11 @@ const AdminDashboard: React.FC = () => {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [userMgmtFilters, setUserMgmtFilters] = useState<UserManagementFilters>(defaultUserManagementFilters);
 
-  const [auditLogs, setAuditLogs] = useState<AuditLogRecord[]>([]);
+  const [auditRecords, setAuditRecords] = useState<AuditSummaryRecord[]>([]);
   const [auditTotal, setAuditTotal] = useState(0);
   const [auditPage, setAuditPage] = useState(1);
   const [loadingAudit, setLoadingAudit] = useState(false);
-  const [auditFilters, setAuditFilters] = useState({ user: '', region: '', eventType: '', status: '', fromDate: '', toDate: '' });
+  const [auditFilters, setAuditFilters] = useState<AuditFilters>(defaultAuditFilters);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -91,10 +92,10 @@ const AdminDashboard: React.FC = () => {
     setError(null);
     try {
       const res = await api.get('/api/internal/audit-logs', {
-        params: { ...auditFilters, page: auditPage, limit: 20 },
+        params: buildAuditParams(auditFilters, { page: auditPage, limit: 20 }),
       });
       const data = res.data.data ?? res.data;
-      setAuditLogs(data.logs || []);
+      setAuditRecords(data.records || []);
       setAuditTotal(data.pagination?.total || 0);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch audit logs');
@@ -145,10 +146,9 @@ const AdminDashboard: React.FC = () => {
   }, [auditPage]);
 
   const excludedAnalytics = new Set(EXCLUDED_ANALYTICS_USERS);
-  const userOptions = (mobileNumberFilterOptions.length > 0
-    ? mobileNumberFilterOptions
-    : users.filter((u) => u.role === 'user').map((u) => u.mobileNumber)
-  ).filter((mobile) => !excludedAnalytics.has(mobile));
+  const userOptions = users
+    .filter((u) => u.role === 'user' && !excludedAnalytics.has(u.mobileNumber))
+    .map((u) => ({ name: u.name, mobileNumber: u.mobileNumber }));
 
   return (
     <AdminLayout
@@ -230,7 +230,7 @@ const AdminDashboard: React.FC = () => {
 
       {mainTab === 'audit' && (
         <AuditLogsTab
-          logs={auditLogs}
+          records={auditRecords}
           total={auditTotal}
           loading={loadingAudit}
           filters={auditFilters}
@@ -238,8 +238,8 @@ const AdminDashboard: React.FC = () => {
           page={auditPage}
           onPageChange={setAuditPage}
           onFetch={fetchAuditLogs}
-          onExportCsv={() => downloadExport('/api/internal/audit-logs/export-csv', 'audit-logs.csv', auditFilters)}
-          onExportExcel={() => downloadExport('/api/internal/audit-logs/export-excel', 'audit-logs.xls', auditFilters)}
+          onExportCsv={() => downloadExport('/api/internal/audit-logs/export-csv', 'audit-activity-summary.csv', buildAuditParams(auditFilters))}
+          onExportExcel={() => downloadExport('/api/internal/audit-logs/export-excel', 'audit-activity-summary.xls', buildAuditParams(auditFilters))}
         />
       )}
     </AdminLayout>

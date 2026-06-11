@@ -47,7 +47,7 @@ async function buildFilterOptions(allRows: ReturnType<typeof prepareAnalyticsRow
 
   const dbUsers = await prisma.user.findMany({
     where: userWhere,
-    select: { mobileNumber: true, region: true },
+    select: { name: true, mobileNumber: true, region: true },
     orderBy: { mobileNumber: 'asc' },
   });
 
@@ -57,7 +57,7 @@ async function buildFilterOptions(allRows: ReturnType<typeof prepareAnalyticsRow
 
   return {
     regions: [...regionSet].sort(),
-    users: dbUsers.map((user) => ({ mobileNumber: user.mobileNumber, region: user.region })),
+    users: dbUsers.map((user) => ({ name: user.name, mobileNumber: user.mobileNumber, region: user.region })),
   };
 }
 
@@ -80,7 +80,7 @@ async function buildInactiveUsers(
 
   const scopedUsers = await prisma.user.findMany({
     where: userWhere,
-    select: { mobileNumber: true, region: true },
+    select: { name: true, mobileNumber: true, region: true },
   });
 
   const activeMobileNumbers = new Set(
@@ -94,6 +94,7 @@ async function buildInactiveUsers(
     .map((user) => {
       const lifetime = lifetimeByUser.get(user.mobileNumber);
       return {
+        name: user.name,
         mobileNumber: user.mobileNumber,
         region: user.region,
         lastSubmission: lifetime?.lastAt?.toISOString() ?? null,
@@ -138,15 +139,15 @@ export async function getUnifiedDashboard(req: Request, res: Response) {
     }));
 
     const userTopChart = Array.from(byUser.entries())
-      .map(([mobileNumber, data]) => ({ mobileNumber, uniqueCount: data.keys.size }))
+      .map(([mobileNumber, data]) => ({ name: data.name, mobileNumber, uniqueCount: data.keys.size }))
       .sort((a, b) => b.uniqueCount - a.uniqueCount);
 
-    const userActivityDistribution = contributionDistribution(
-      userTopChart.map((item) => ({ name: item.mobileNumber, uniqueCount: item.uniqueCount })),
-    ).map((item) => ({
-      mobileNumber: item.name,
+    const userChartTotal = userTopChart.reduce((sum, item) => sum + item.uniqueCount, 0);
+    const userActivityDistribution = userTopChart.map((item) => ({
+      name: item.name,
+      mobileNumber: item.mobileNumber,
       uniqueCount: item.uniqueCount,
-      percentage: Math.round(item.percentage),
+      percentage: userChartTotal ? Math.round((item.uniqueCount / userChartTotal) * 100) : 0,
     }));
 
     const regionLeaderboard = leaderboardFromRows(rangeRows, 'region').map((item) => ({
@@ -155,11 +156,15 @@ export async function getUnifiedDashboard(req: Request, res: Response) {
       totalSubmissions: item.totalSubmissions,
     }));
 
-    const userLeaderboard = leaderboardFromRows(rangeRows, 'user').map((item) => ({
-      rank: item.rank,
-      mobileNumber: item.name,
-      totalSubmissions: item.totalSubmissions,
-    }));
+    const userLeaderboard = leaderboardFromRows(rangeRows, 'user').map((item) => {
+      const entry = item as { rank: number; name: string; mobileNumber: string; totalSubmissions: number };
+      return {
+        rank: entry.rank,
+        name: entry.name,
+        mobileNumber: entry.mobileNumber,
+        totalSubmissions: entry.totalSubmissions,
+      };
+    });
 
     return res.status(200).json({
       success: true,

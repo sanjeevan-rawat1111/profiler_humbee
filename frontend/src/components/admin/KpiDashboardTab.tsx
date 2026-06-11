@@ -56,7 +56,7 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
         <KpiCard
           icon={<Trophy className="w-4 h-4" />}
           label="Top Performer"
-          value={summary.topPerformer ? `${summary.topPerformer.mobileNumber} (${summary.topPerformer.uniqueCount})` : '—'}
+          value={summary.topPerformer ? `${summary.topPerformer.name} (${summary.topPerformer.uniqueCount})` : '—'}
           accent="bg-amber-50 text-amber-700"
         />
         <KpiCard icon={<Calendar className="w-4 h-4" />} label="Today's Submissions" value={summary.todaysSubmissions} />
@@ -169,7 +169,8 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
           <thead>
             <tr className="bg-slate-50 text-slate-500">
               <th className="p-4 text-left">Rank</th>
-              <th className="p-4 text-left">User</th>
+              <th className="p-4 text-left">Name</th>
+              <th className="p-4 text-left">User Mobile</th>
               <th className="p-4 text-left">Unique Submissions</th>
               <th className="p-4 text-left">First Submission</th>
               <th className="p-4 text-left">Last Submission</th>
@@ -179,7 +180,8 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
             {data.topPerformingUsers.map((row) => (
               <tr key={row.mobileNumber}>
                 <td className="p-4 font-bold text-slate-400">#{row.rank}</td>
-                <td className="p-4 font-mono font-bold text-slate-800">{row.mobileNumber}</td>
+                <td className="p-4 font-bold text-slate-800">{row.name}</td>
+                <td className="p-4 font-mono text-slate-700">{row.mobileNumber}</td>
                 <td className="p-4 font-mono text-humbee-700">{row.uniqueSubmissions}</td>
                 <td className="p-4 text-slate-400">{row.firstSubmission ? formatDateTime(row.firstSubmission) : '—'}</td>
                 <td className="p-4 text-amber-700">{row.lastSubmission ? formatDateTime(row.lastSubmission) : '—'}</td>
@@ -197,7 +199,8 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
           <thead>
             <tr className="bg-slate-50 text-slate-500">
               <th className="p-4 text-left">Timestamp</th>
-              <th className="p-4 text-left">User</th>
+              <th className="p-4 text-left">Name</th>
+              <th className="p-4 text-left">User Mobile</th>
               <th className="p-4 text-left">SAP Code</th>
               <th className="p-4 text-left">VCP Mobile</th>
             </tr>
@@ -206,7 +209,8 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
             {data.recentActivity.map((row, i) => (
               <tr key={`${row.timestamp}-${i}`}>
                 <td className="p-4">{formatDateTime(row.timestamp)}</td>
-                <td className="p-4 font-mono font-semibold">{row.userMobileNumber}</td>
+                <td className="p-4 font-semibold text-slate-800">{row.userName}</td>
+                <td className="p-4 font-mono text-slate-700">{row.userMobileNumber}</td>
                 <td className="p-4 font-mono text-humbee-600">{row.sapCode}</td>
                 <td className="p-4 font-mono">{row.customerMobileNumber}</td>
               </tr>

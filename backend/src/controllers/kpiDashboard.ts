@@ -17,12 +17,12 @@ import {
 } from '../utils/submissionFilters';
 
 function uniqueByUser(rows: SubmissionRow[]) {
-  const map = new Map<string, Set<string>>();
+  const map = new Map<string, { name: string; keys: Set<string> }>();
   rows.forEach((row) => {
     if (!isAnalyticsUser(row)) return;
     const key = row.user!.mobileNumber;
-    if (!map.has(key)) map.set(key, new Set());
-    map.get(key)?.add(uniqueSubmissionKey(row));
+    if (!map.has(key)) map.set(key, { name: row.user!.name, keys: new Set() });
+    map.get(key)?.keys.add(uniqueSubmissionKey(row));
   });
   return map;
 }
@@ -65,7 +65,7 @@ export async function getKpiDashboard(req: Request, res: Response) {
 
     const userUniqueMap = uniqueByUser(periodRows);
     const userPerformance = Array.from(userUniqueMap.entries())
-      .map(([mobileNumber, set]) => ({ mobileNumber, uniqueCount: set.size }))
+      .map(([mobileNumber, data]) => ({ name: data.name, mobileNumber, uniqueCount: data.keys.size }))
       .sort((a, b) => {
         const diff = a.uniqueCount - b.uniqueCount;
         return filters.rankingSort === 'asc' ? diff || a.mobileNumber.localeCompare(b.mobileNumber) : -diff || a.mobileNumber.localeCompare(b.mobileNumber);
@@ -79,6 +79,7 @@ export async function getKpiDashboard(req: Request, res: Response) {
 
     const totalUniqueAll = countUniqueSubmissions(periodRows);
     const contribution = userPerformance.map((item) => ({
+      name: item.name,
       mobileNumber: item.mobileNumber,
       uniqueCount: item.uniqueCount,
       percentage: totalUniqueAll > 0 ? Math.round((item.uniqueCount / totalUniqueAll) * 1000) / 10 : 0,
@@ -113,6 +114,7 @@ export async function getKpiDashboard(req: Request, res: Response) {
       const bounds = userFirstLast.get(item.mobileNumber);
       return {
         rank: index + 1,
+        name: item.name,
         mobileNumber: item.mobileNumber,
         uniqueSubmissions: item.uniqueCount,
         firstSubmission: bounds?.first.toISOString() ?? null,
@@ -122,7 +124,8 @@ export async function getKpiDashboard(req: Request, res: Response) {
 
     const recentActivity = allRows.slice(0, 20).map((row) => ({
       timestamp: row.submittedAt.toISOString(),
-      userMobileNumber: row.user?.mobileNumber ?? 'System',
+      userName: row.user?.name ?? 'System',
+      userMobileNumber: row.user?.mobileNumber ?? '',
       region: row.user?.region ?? '',
       sapCode: row.sapCode,
       customerMobileNumber: row.mobileNumber,
@@ -133,7 +136,7 @@ export async function getKpiDashboard(req: Request, res: Response) {
         role: 'user',
         mobileNumber: { notIn: excludedAnalyticsMobileNumbers() },
       },
-      select: { mobileNumber: true, region: true },
+      select: { name: true, mobileNumber: true, region: true },
       orderBy: { mobileNumber: 'asc' },
     });
 
@@ -171,10 +174,10 @@ export async function exportKpiCsv(req: Request, res: Response) {
     const allRows = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters));
     const userMap = uniqueByUser(allRows);
     const rows = Array.from(userMap.entries())
-      .map(([mobileNumber, set]) => [mobileNumber, set.size])
-      .sort((a, b) => Number(b[1]) - Number(a[1]));
+      .map(([mobileNumber, data]) => [data.name, mobileNumber, data.keys.size])
+      .sort((a, b) => Number(b[2]) - Number(a[2]));
 
-    return sendCsv(res, 'kpi-dashboard.csv', ['Mobile Number', 'Unique Submissions'], rows);
+    return sendCsv(res, 'kpi-dashboard.csv', ['Name', 'User Mobile', 'Unique Submissions'], rows);
   } catch (error) {
     console.error('exportKpiCsv error:', error);
     return res.status(500).json({ success: false, message: 'Internal server error' });
@@ -187,10 +190,10 @@ export async function exportKpiExcel(req: Request, res: Response) {
     const allRows = filterAnalyticsRows(await fetchFilteredSubmissions(prisma, filters));
     const userMap = uniqueByUser(allRows);
     const rows = Array.from(userMap.entries())
-      .map(([mobileNumber, set]) => [mobileNumber, set.size])
-      .sort((a, b) => Number(b[1]) - Number(a[1]));
+      .map(([mobileNumber, data]) => [data.name, mobileNumber, data.keys.size])
+      .sort((a, b) => Number(b[2]) - Number(a[2]));
 
-    return sendExcel(res, 'kpi-dashboard.xls', ['Mobile Number', 'Unique Submissions'], rows);
+    return sendExcel(res, 'kpi-dashboard.xls', ['Name', 'User Mobile', 'Unique Submissions'], rows);
   } catch (error) {
     console.error('exportKpiExcel error:', error);
     return res.status(500).json({ success: false, message: 'Internal server error' });

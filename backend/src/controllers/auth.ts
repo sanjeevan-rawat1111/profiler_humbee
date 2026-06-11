@@ -16,7 +16,20 @@ export async function login(req: Request, res: Response) {
         username: mobileNumber,
         eventType: 'LOGIN',
         status: 'FAIL',
-        reason: 'Invalid mobile number or password',
+        reason: 'Invalid mobile number',
+      });
+      return res.status(401).json({ success: false, message: 'Invalid mobile number or password' });
+    }
+
+    if (user.status === 'inactive') {
+      await recordAuditLog({
+        userId: user.id,
+        username: mobileNumber,
+        name: user.name,
+        region: user.region,
+        eventType: 'LOGIN',
+        status: 'FAIL',
+        reason: 'User account disabled',
       });
       return res.status(401).json({ success: false, message: 'Invalid mobile number or password' });
     }
@@ -26,10 +39,11 @@ export async function login(req: Request, res: Response) {
       await recordAuditLog({
         userId: user.id,
         username: mobileNumber,
+        name: user.name,
         region: user.region,
         eventType: 'LOGIN',
         status: 'FAIL',
-        reason: 'Invalid mobile number or password',
+        reason: 'Invalid password',
       });
       return res.status(401).json({ success: false, message: 'Invalid mobile number or password' });
     }
@@ -39,9 +53,11 @@ export async function login(req: Request, res: Response) {
     await recordAuditLog({
       userId: user.id,
       username: user.mobileNumber,
+      name: user.name,
       region: user.region,
       eventType: 'LOGIN',
       status: 'SUCCESS',
+      reason: 'Authentication successful',
     });
 
     return res.status(200).json({
@@ -50,6 +66,7 @@ export async function login(req: Request, res: Response) {
         token,
         user: {
           id: user.id,
+          name: user.name,
           mobileNumber: user.mobileNumber,
           role: user.role,
           status: user.status,
@@ -66,13 +83,18 @@ export async function login(req: Request, res: Response) {
 export async function logout(req: AuthenticatedRequest, res: Response) {
   try {
     if (req.user) {
-      const user = await prisma.user.findUnique({ where: { id: req.user.userId }, select: { region: true } });
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.userId },
+        select: { name: true, region: true },
+      });
       await recordAuditLog({
         userId: req.user.userId,
         username: req.user.mobileNumber,
+        name: user?.name ?? null,
         region: user?.region ?? null,
         eventType: 'LOGOUT',
         status: 'SUCCESS',
+        reason: 'User initiated logout',
       });
     }
     return res.status(200).json({ success: true, message: 'Logout successful' });
@@ -98,6 +120,7 @@ export async function validate(req: AuthenticatedRequest, res: Response) {
       data: {
         user: {
           id: user.id,
+          name: user.name,
           mobileNumber: user.mobileNumber,
           role: user.role,
           status: user.status,

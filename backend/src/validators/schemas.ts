@@ -16,6 +16,7 @@ export const submissionSchema = z.object({
 });
 
 export const createUserSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required'),
   mobileNumber: mobileNumberField,
   password: z.string()
     .regex(/^(?=.*[A-Z])(?=.*\d).{6,}$/, 'Password must be at least 6 characters, contain 1 uppercase letter and 1 number'),
@@ -25,6 +26,7 @@ export const createUserSchema = z.object({
 });
 
 export const updateUserSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').optional(),
   mobileNumber: mobileNumberField.optional(),
   password: z.string()
     .regex(/^(?=.*[A-Z])(?=.*\d).{6,}$/, 'Password must be at least 6 characters, contain 1 uppercase letter and 1 number')
