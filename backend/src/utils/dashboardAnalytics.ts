@@ -80,6 +80,34 @@ export function uniqueByState(rows: SubmissionRow[]) {
   return { submissions: map, users: usersByState };
 }
 
+export function uniqueByDistrict(rows: SubmissionRow[]) {
+  const map = new Map<string, { district: string; state: string; keys: Set<string> }>();
+  rows.forEach((row) => {
+    if (!row.user) return;
+    const district = row.user.district || 'Unknown';
+    const state = row.user.state || 'Unknown';
+    const key = `${state}\0${district}`;
+    if (!map.has(key)) map.set(key, { district, state, keys: new Set() });
+    map.get(key)?.keys.add(uniqueSubmissionKey(row));
+  });
+  return map;
+}
+
+export function uniqueByRegion(
+  rows: SubmissionRow[],
+  stateRegionMap: Map<string, { regionId: string | null; regionName: string }>,
+) {
+  const map = new Map<string, Set<string>>();
+  rows.forEach((row) => {
+    if (!row.user) return;
+    const info = stateRegionMap.get(row.user.stateId || '');
+    const region = info?.regionName || 'Unassigned';
+    if (!map.has(region)) map.set(region, new Set());
+    map.get(region)?.add(uniqueSubmissionKey(row));
+  });
+  return map;
+}
+
 export function topEntry<T extends string>(map: Map<T, Set<string>>): { name: T; count: number } | null {
   let best: { name: T; count: number } | null = null;
   map.forEach((keys, name) => {

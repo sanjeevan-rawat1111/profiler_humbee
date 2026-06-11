@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Plus, Trash2, Pencil, Eye, EyeOff, FileDown, FileSpreadsheet } from 'lucide-react';
 import api from '../../services/api';
 import SearchableMultiSelect from './SearchableMultiSelect';
@@ -6,7 +6,7 @@ import RegionStateDistrictSelect from '../RegionStateDistrictSelect';
 import ManagerRegionSelect from '../ManagerRegionSelect';
 import type { DBUser, UserManagementFilters } from '../../types/admin';
 import { defaultUserManagementFilters } from '../../types/admin';
-import { formatDateTime } from '../../utils/adminApi';
+import { fetchFilterNameOptions, formatDateTime } from '../../utils/adminApi';
 
 const STATUS_OPTIONS = ['Active', 'Inactive'];
 const ROLE_OPTIONS = [
@@ -76,6 +76,11 @@ const UserManagementTab: React.FC<Props> = ({
   const updateFilters = (patch: Partial<UserManagementFilters>) => {
     onFiltersChange({ ...filters, ...patch });
   };
+
+  const loadNameOptions = useCallback(
+    (query: string) => fetchFilterNameOptions(query),
+    [],
+  );
 
   const clearFilters = () => {
     onFiltersChange(defaultUserManagementFilters);
@@ -226,7 +231,7 @@ const UserManagementTab: React.FC<Props> = ({
   };
 
   const hasActiveFilters = filters.regionId || filters.stateId || filters.districtId
-    || filters.mobileNumbers.length > 0 || filters.role || filters.statuses.length > 0;
+    || filters.names.length > 0 || filters.mobileNumbers.length > 0 || filters.role || filters.statuses.length > 0;
 
   return (
     <div className="space-y-6">
@@ -249,10 +254,17 @@ const UserManagementTab: React.FC<Props> = ({
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4">
-        <div className="flex flex-col lg:flex-row gap-4">
+        <div className="flex flex-col lg:flex-row gap-4 flex-wrap">
           <SearchableMultiSelect
-            label="Mobile Number"
-            placeholder="Search mobile number..."
+            label="Name"
+            placeholder="Search name..."
+            selected={filters.names}
+            onChange={(names) => updateFilters({ names })}
+            loadOptions={loadNameOptions}
+          />
+          <SearchableMultiSelect
+            label="User Mobile"
+            placeholder="Search user mobile..."
             options={mobileNumberOptions}
             selected={filters.mobileNumbers}
             onChange={(mobileNumbers) => updateFilters({ mobileNumbers })}

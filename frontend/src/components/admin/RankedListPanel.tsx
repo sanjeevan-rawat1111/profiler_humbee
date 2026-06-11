@@ -66,10 +66,10 @@ const RankedListPanel: React.FC<RankedListPanelProps> = ({
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value as SortOrder)}
               aria-label="Sort order"
-              className="input-style-compact w-[4.75rem] text-xs"
+              className="input-style-compact min-w-[9.5rem] text-xs"
             >
-              <option value="desc">Most</option>
-              <option value="asc">Least</option>
+              <option value="desc">Most Submissions</option>
+              <option value="asc">Least Submissions</option>
             </select>
           </div>
         )}

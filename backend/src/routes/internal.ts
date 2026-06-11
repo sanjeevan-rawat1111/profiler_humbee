@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
-  getUsers, getUserPassword, createUser, updateUser, deleteUser, resetUserPassword,
+  getUsers, getFilterNameOptions, getFilterMobileOptions, getUserNameOptions, getUserPassword,
+  createUser, updateUser, deleteUser, resetUserPassword,
   exportUsersCsv, exportUsersExcel,
   getSubmissions, getSubmissionKpis, exportSubmissions,
 } from '../controllers/internal';
@@ -38,6 +39,10 @@ const resetPasswordSchema = z.object({
 
 router.use(adminMiddleware);
 
+// Shared filter options (admin + manager)
+router.get('/filter-options/names', getFilterNameOptions);
+router.get('/filter-options/mobiles', getFilterMobileOptions);
+
 // Geo master
 router.get('/geo/regions', getGeoRegions);
 router.get('/geo/states', getStates);
@@ -51,6 +56,7 @@ router.delete('/regions/:id', adminOnlyMiddleware, deleteRegion);
 
 // Users (admin only)
 router.get('/users', adminOnlyMiddleware, getUsers);
+router.get('/users/name-options', adminOnlyMiddleware, getUserNameOptions);
 router.get('/users/:id/password', adminOnlyMiddleware, getUserPassword);
 router.get('/users/export-csv', adminOnlyMiddleware, exportUsersCsv);
 router.get('/users/export-excel', adminOnlyMiddleware, exportUsersExcel);

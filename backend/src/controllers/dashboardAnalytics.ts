@@ -11,14 +11,11 @@ import {
   contributionDistribution,
   countActiveStates,
   countActiveUsers,
-  filterRowsBySelections,
-  geographyLeaderboardFromRows,
-  GeographyLevel,
-  leaderboardFromRows,
-  parseArrayParam,
   prepareAnalyticsRows,
   resolveDashboardRange,
   rowsInRange,
+  uniqueByDistrict,
+  uniqueByRegion,
   uniqueByState,
   uniqueByUser,
 } from '../utils/dashboardAnalytics';
@@ -30,57 +27,42 @@ import {
   resolveSubmissionFetchOptions,
 } from '../utils/geographyScope';
 
-function parseUnifiedQuery(query: Record<string, unknown>) {
-  const period = String(query.period || 'week');
-  const fromDate = String(query.fromDate || '').trim();
-  const toDate = String(query.toDate || '').trim();
-  const regionId = String(query.regionId || '').trim();
-  const stateId = String(query.stateId || '').trim();
-  const districtId = String(query.districtId || '').trim();
-  const geoLevel = (['region', 'state', 'district'].includes(String(query.geoLevel || 'state'))
-    ? String(query.geoLevel)
-    : 'state') as GeographyLevel;
-  const users = parseArrayParam(query.users ?? query.user);
-  return { period, fromDate, toDate, regionId, stateId, districtId, geoLevel, users };
-}
-
-async function loadScopedAnalyticsRows(req: AuthenticatedRequest) {
-  const filters = parseFilterQuery({});
-  const fetchOptions = await resolveSubmissionFetchOptions(filters, req.geographyScope);
-  const rows = await fetchFilteredSubmissions(prisma, filters, fetchOptions);
-  return filterRowsByGeographyScope(prepareAnalyticsRows(rows), req.geographyScope ?? { unrestricted: true, districtIds: [], stateIds: [], regionIds: [] });
+async function loadScopedAnalyticsRows(req: AuthenticatedRequest, options?: { skipDate?: boolean }) {
+  const filters = parseFilterQuery(req.query);
+  const scope = req.geographyScope ?? { unrestricted: true, districtIds: [], stateIds: [], regionIds: [] };
+  const fetchOptions = await resolveSubmissionFetchOptions(filters, scope);
+  const rows = await fetchFilteredSubmissions(prisma, filters, { ...fetchOptions, skipDate: options?.skipDate });
+  return filterRowsByGeographyScope(prepareAnalyticsRows(rows), scope);
 }
 
 async function buildInactiveUsers(
   allRows: ReturnType<typeof prepareAnalyticsRows>,
   rangeRows: ReturnType<typeof prepareAnalyticsRows>,
-  regionId: string,
-  stateId: string,
-  districtId: string,
-  users: string[],
+  filters: ReturnType<typeof parseFilterQuery>,
   scope: AuthenticatedRequest['geographyScope'],
 ) {
   const userWhere: Record<string, unknown> = {
     role: 'user',
     mobileNumber: { notIn: excludedAnalyticsMobileNumbers() },
   };
-  if (districtId) {
-    userWhere.districtId = districtId;
-  } else if (stateId) {
-    userWhere.stateId = stateId;
-  } else if (regionId) {
-    const regionStateIds = await resolveRegionStateIds(regionId);
+  if (filters.districtId) {
+    userWhere.districtId = filters.districtId;
+  } else if (filters.stateId) {
+    userWhere.stateId = filters.stateId;
+  } else if (filters.regionId) {
+    const regionStateIds = await resolveRegionStateIds(filters.regionId);
     userWhere.stateId = { in: regionStateIds.length ? regionStateIds : ['__none__'] };
   }
-  if (users.length) {
+  if (filters.names.length) userWhere.name = { in: filters.names };
+  if (filters.userMobiles.length) {
     userWhere.mobileNumber = {
-      in: users.filter((mobile) => !isExcludedAnalyticsMobile(mobile)),
+      in: filters.userMobiles.filter((mobile) => !isExcludedAnalyticsMobile(mobile)),
     };
   }
   if (scope && !scope.unrestricted) {
     if (scope.districtIds.length) {
-      userWhere.districtId = districtId && scope.districtIds.includes(districtId)
-        ? districtId
+      userWhere.districtId = filters.districtId && scope.districtIds.includes(filters.districtId)
+        ? filters.districtId
         : { in: scope.districtIds };
     } else {
       userWhere.districtId = { in: ['__none__'] };
@@ -96,7 +78,7 @@ async function buildInactiveUsers(
     rangeRows.map((row) => row.user?.mobileNumber).filter(Boolean) as string[],
   );
 
-  const lifetimeByUser = uniqueByUser(filterRowsBySelections(allRows, regionId, stateId, districtId, users));
+  const lifetimeByUser = uniqueByUser(allRows);
 
   const inactiveList = scopedUsers
     .filter((user) => !activeMobileNumbers.has(user.mobileNumber))
@@ -124,47 +106,33 @@ async function buildInactiveUsers(
 }
 
 export async function getUnifiedDashboard(req: AuthenticatedRequest, res: Response) {
-  const { period, fromDate, toDate, regionId, stateId, districtId, geoLevel, users } = parseUnifiedQuery(req.query);
+  const filters = parseFilterQuery(req.query);
   const scope = req.geographyScope ?? { unrestricted: true, districtIds: [], stateIds: [], regionIds: [] };
 
-  const effectiveRegionId = scope.unrestricted
-    ? regionId
-    : (regionId && scope.regionIds.includes(regionId) ? regionId : regionId ? '__blocked__' : '');
-  const effectiveStateId = scope.unrestricted
-    ? stateId
-    : (stateId && scope.stateIds.includes(stateId) ? stateId : stateId ? '__blocked__' : '');
-  const effectiveDistrictId = scope.unrestricted
-    ? districtId
-    : (districtId && scope.districtIds.includes(districtId) ? districtId : districtId ? '__blocked__' : '');
-
   try {
-    const allRows = await loadScopedAnalyticsRows(req);
+    const allRows = await loadScopedAnalyticsRows(req, { skipDate: true });
     const stateRegionMap = await loadStateRegionMap();
-    const regionStateIds = effectiveRegionId ? await resolveRegionStateIds(effectiveRegionId) : undefined;
-    const filteredRows = filterRowsBySelections(
-      allRows,
-      effectiveRegionId,
-      effectiveStateId,
-      effectiveDistrictId,
-      users,
-      stateRegionMap,
-      regionStateIds,
-    );
-    const range = resolveDashboardRange(period, fromDate, toDate);
-    const rangeRows = rowsInRange(filteredRows, range);
-    const filterOptions = await buildScopedFilterOptions(scope, effectiveRegionId, effectiveStateId);
-    const inactiveUsers = await buildInactiveUsers(
-      allRows,
-      rangeRows,
-      effectiveRegionId,
-      effectiveStateId,
-      effectiveDistrictId,
-      users,
-      scope,
-    );
+    const range = resolveDashboardRange(filters.period, filters.fromDate, filters.toDate);
+    const rangeRows = rowsInRange(allRows, range);
+    const filterOptions = await buildScopedFilterOptions(scope, filters.regionId, filters.stateId);
+    const inactiveUsers = await buildInactiveUsers(allRows, rangeRows, filters, scope);
 
     const byState = uniqueByState(rangeRows);
+    const byRegion = uniqueByRegion(rangeRows, stateRegionMap);
+    const byDistrict = uniqueByDistrict(rangeRows);
     const byUser = uniqueByUser(rangeRows);
+
+    const regionTotalChart = Array.from(byRegion.entries())
+      .map(([region, keys]) => ({ region, uniqueCount: keys.size }))
+      .sort((a, b) => b.uniqueCount - a.uniqueCount);
+
+    const regionContribution = contributionDistribution(
+      regionTotalChart.map((item) => ({ name: item.region, uniqueCount: item.uniqueCount })),
+    ).map((item) => ({
+      region: item.name,
+      uniqueCount: item.uniqueCount,
+      percentage: Math.round(item.percentage),
+    }));
 
     const stateTotalChart = Array.from(byState.submissions.entries())
       .map(([state, keys]) => ({ state, uniqueCount: keys.size }))
@@ -178,6 +146,33 @@ export async function getUnifiedDashboard(req: AuthenticatedRequest, res: Respon
       percentage: Math.round(item.percentage),
     }));
 
+    const districtTotalChart = Array.from(byDistrict.values())
+      .map((entry) => ({
+        district: entry.district,
+        state: entry.state,
+        uniqueCount: entry.keys.size,
+      }))
+      .sort((a, b) => b.uniqueCount - a.uniqueCount);
+
+    const districtContributionSources = districtTotalChart.map((item) => ({
+      name: `${item.district}, ${item.state}`,
+      district: item.district,
+      state: item.state,
+      uniqueCount: item.uniqueCount,
+    }));
+    const districtContribution = contributionDistribution(
+      districtContributionSources.map((item) => ({ name: item.name, uniqueCount: item.uniqueCount })),
+    ).map((item) => {
+      const source = districtContributionSources.find((entry) => entry.name === item.name);
+      return {
+        district: source?.district ?? item.name,
+        state: source?.state ?? '',
+        label: item.name,
+        uniqueCount: item.uniqueCount,
+        percentage: Math.round(item.percentage),
+      };
+    });
+
     const userTopChart = Array.from(byUser.entries())
       .map(([mobileNumber, data]) => ({ name: data.name, mobileNumber, uniqueCount: data.keys.size }))
       .sort((a, b) => b.uniqueCount - a.uniqueCount);
@@ -190,36 +185,21 @@ export async function getUnifiedDashboard(req: AuthenticatedRequest, res: Respon
       percentage: userChartTotal ? Math.round((item.uniqueCount / userChartTotal) * 100) : 0,
     }));
 
-    const geographyLeaderboard = geographyLeaderboardFromRows(rangeRows, geoLevel, stateRegionMap);
-    const stateLeaderboard = leaderboardFromRows(rangeRows, 'state').map((item) => ({
-      rank: item.rank,
-      state: item.name,
-      totalSubmissions: item.totalSubmissions,
-    }));
-
-    const userLeaderboard = leaderboardFromRows(rangeRows, 'user').map((item) => {
-      const entry = item as { rank: number; name: string; mobileNumber: string; totalSubmissions: number };
-      return {
-        rank: entry.rank,
-        name: entry.name,
-        mobileNumber: entry.mobileNumber,
-        totalSubmissions: entry.totalSubmissions,
-      };
-    });
-
     return res.status(200).json({
       success: true,
       data: {
         lastUpdated: new Date().toISOString(),
         filters: {
-          period,
-          fromDate,
-          toDate,
-          regionId: effectiveRegionId,
-          stateId: effectiveStateId,
-          districtId: effectiveDistrictId,
-          geoLevel,
-          users,
+          period: filters.period,
+          fromDate: filters.fromDate,
+          toDate: filters.toDate,
+          regionId: filters.regionId,
+          stateId: filters.stateId,
+          districtId: filters.districtId,
+          names: filters.names,
+          userMobiles: filters.userMobiles,
+          sapCode: filters.sapCode,
+          mobileNumber: filters.mobileNumber,
         },
         filterOptions,
         summary: {
@@ -229,18 +209,21 @@ export async function getUnifiedDashboard(req: AuthenticatedRequest, res: Respon
           inactiveUsers: inactiveUsers.count,
         },
         inactiveUsers: inactiveUsers.list,
+        regions: {
+          totalChart: regionTotalChart,
+          contribution: regionContribution,
+        },
         states: {
           totalChart: stateTotalChart,
           contribution: stateContribution,
         },
+        districts: {
+          totalChart: districtTotalChart,
+          contribution: districtContribution,
+        },
         users: {
           topChart: userTopChart,
           activityDistribution: userActivityDistribution,
-        },
-        topPerformers: {
-          geography: geographyLeaderboard,
-          states: stateLeaderboard,
-          users: userLeaderboard,
         },
       },
     });

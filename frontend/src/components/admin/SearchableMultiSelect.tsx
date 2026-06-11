@@ -1,34 +1,70 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { X, ChevronDown, Check } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { X, ChevronDown, Check, Loader2 } from 'lucide-react';
 
 interface SearchableMultiSelectProps {
   label: string;
   placeholder?: string;
-  options: string[];
+  options?: string[];
   selected: string[];
   onChange: (selected: string[]) => void;
   disabled?: boolean;
+  loadOptions?: (query: string) => Promise<string[]>;
 }
 
 const SearchableMultiSelect: React.FC<SearchableMultiSelectProps> = ({
   label,
   placeholder = 'Type to search...',
-  options,
+  options = [],
   selected,
   onChange,
   disabled = false,
+  loadOptions,
 }) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [asyncOptions, setAsyncOptions] = useState<string[]>([]);
+  const [loadingOptions, setLoadingOptions] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const requestIdRef = useRef(0);
+
+  const fetchAsyncOptions = useCallback(async (searchQuery: string) => {
+    if (!loadOptions) return;
+    const requestId = ++requestIdRef.current;
+    setLoadingOptions(true);
+    try {
+      const results = await loadOptions(searchQuery);
+      if (requestId === requestIdRef.current) {
+        setAsyncOptions(results);
+      }
+    } catch {
+      if (requestId === requestIdRef.current) {
+        setAsyncOptions([]);
+      }
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setLoadingOptions(false);
+      }
+    }
+  }, [loadOptions]);
+
+  useEffect(() => {
+    if (!loadOptions || !open) return;
+    const timer = window.setTimeout(() => {
+      void fetchAsyncOptions(query);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [loadOptions, open, query, fetchAsyncOptions]);
+
+  const sourceOptions = loadOptions ? asyncOptions : options;
 
   const filteredOptions = useMemo(() => {
+    const available = sourceOptions.filter((opt) => !selected.includes(opt));
+    if (loadOptions) return available;
     const q = query.trim().toLowerCase();
-    const available = options.filter((opt) => !selected.includes(opt));
     if (!q) return available;
     return available.filter((opt) => opt.toLowerCase().includes(q));
-  }, [options, selected, query]);
+  }, [sourceOptions, selected, query, loadOptions]);
 
   const allVisibleSelected = filteredOptions.length > 0
     && filteredOptions.every((opt) => selected.includes(opt));
@@ -142,7 +178,12 @@ const SearchableMultiSelect: React.FC<SearchableMultiSelectProps> = ({
             )}
           </div>
           <ul className="max-h-48 overflow-y-auto py-1">
-            {filteredOptions.length === 0 ? (
+            {loadingOptions ? (
+              <li className="px-3 py-3 flex items-center justify-center gap-2 text-xs text-slate-400">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Searching...
+              </li>
+            ) : filteredOptions.length === 0 ? (
               <li className="px-3 py-2 text-xs text-slate-400">No matches found</li>
             ) : (
               filteredOptions.map((option) => (

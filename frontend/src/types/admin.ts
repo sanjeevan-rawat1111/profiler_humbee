@@ -6,7 +6,8 @@ export type GeographyLevel = 'region' | 'state' | 'district';
 
 export interface SubmissionFilters {
   search: string;
-  user: string;
+  names: string[];
+  userMobiles: string[];
   regionId: string;
   stateId: string;
   districtId: string;
@@ -100,8 +101,8 @@ export interface AuditActivityDetail {
 
 export interface AuditFilters {
   search: string;
-  name: string;
-  user: string;
+  names: string[];
+  userMobiles: string[];
   regionId: string;
   stateId: string;
   districtId: string;
@@ -113,8 +114,8 @@ export interface AuditFilters {
 
 export const defaultAuditFilters: AuditFilters = {
   search: '',
-  name: '',
-  user: '',
+  names: [],
+  userMobiles: [],
   regionId: '',
   stateId: '',
   districtId: '',
@@ -152,8 +153,10 @@ export interface UnifiedDashboardData {
     regionId: string;
     stateId: string;
     districtId: string;
-    geoLevel: GeographyLevel;
-    users: string[];
+    names: string[];
+    userMobiles: string[];
+    sapCode: string;
+    mobileNumber: string;
   };
   filterOptions: {
     regions: import('./geo').GeoRegion[];
@@ -181,24 +184,27 @@ export interface UnifiedDashboardData {
     district: string;
     lastSubmission: string | null;
   }[];
+  regions: {
+    totalChart: { region: string; uniqueCount: number }[];
+    contribution: { region: string; uniqueCount: number; percentage: number }[];
+  };
   states: {
     totalChart: { state: string; uniqueCount: number }[];
     contribution: { state: string; uniqueCount: number; percentage: number }[];
   };
+  districts: {
+    totalChart: { district: string; state: string; uniqueCount: number }[];
+    contribution: {
+      district: string;
+      state: string;
+      label: string;
+      uniqueCount: number;
+      percentage: number;
+    }[];
+  };
   users: {
     topChart: { name: string; mobileNumber: string; uniqueCount: number }[];
     activityDistribution: { name: string; mobileNumber: string; uniqueCount: number; percentage: number }[];
-  };
-  topPerformers: {
-    geography: {
-      rank: number;
-      name: string;
-      totalSubmissions: number;
-      activeUsers: number;
-      contributionPct: number;
-    }[];
-    states: { rank: number; state: string; totalSubmissions: number }[];
-    users: { rank: number; name: string; mobileNumber: string; totalSubmissions: number }[];
   };
 }
 
@@ -228,6 +234,7 @@ export interface UserManagementFilters {
   regionId: string;
   stateId: string;
   districtId: string;
+  names: string[];
   mobileNumbers: string[];
   role: string;
   statuses: string[];
@@ -237,6 +244,7 @@ export const defaultUserManagementFilters: UserManagementFilters = {
   regionId: '',
   stateId: '',
   districtId: '',
+  names: [],
   mobileNumbers: [],
   role: '',
   statuses: [],
@@ -244,7 +252,8 @@ export const defaultUserManagementFilters: UserManagementFilters = {
 
 export const defaultFilters: SubmissionFilters = {
   search: '',
-  user: '',
+  names: [],
+  userMobiles: [],
   regionId: '',
   stateId: '',
   districtId: '',

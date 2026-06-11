@@ -22,7 +22,8 @@ export function buildFilterParams(filters: SubmissionFilters, extra: Record<stri
     ...extra,
   };
   if (filters.search) params.search = filters.search;
-  if (filters.user) params.user = filters.user;
+  if (filters.names.length) params.names = filters.names.join(',');
+  if (filters.userMobiles.length) params.userMobiles = filters.userMobiles.join(',');
   if (filters.regionId) params.regionId = filters.regionId;
   if (filters.stateId) params.stateId = filters.stateId;
   if (filters.districtId) params.districtId = filters.districtId;
@@ -37,8 +38,8 @@ export function buildAuditParams(filters: AuditFilters, extra: Record<string, st
     ...extra,
   };
   if (filters.search) params.search = filters.search;
-  if (filters.name) params.name = filters.name;
-  if (filters.user) params.user = filters.user;
+  if (filters.names.length) params.names = filters.names.join(',');
+  if (filters.userMobiles.length) params.userMobiles = filters.userMobiles.join(',');
   if (filters.regionId) params.regionId = filters.regionId;
   if (filters.stateId) params.stateId = filters.stateId;
   if (filters.districtId) params.districtId = filters.districtId;
@@ -78,9 +79,24 @@ export function buildUserMgmtParams(filters: UserManagementFilters) {
   if (filters.stateId) params.stateId = filters.stateId;
   if (filters.districtId) params.districtId = filters.districtId;
   if (filters.role) params.role = filters.role;
+  if (filters.names.length) params.names = filters.names.join(',');
   if (filters.mobileNumbers.length) params.mobileNumbers = filters.mobileNumbers.join(',');
   if (filters.statuses.length) params.status = filters.statuses.join(',');
   return params;
+}
+
+export async function fetchFilterNameOptions(query: string, role?: string) {
+  const res = await api.get('/api/internal/filter-options/names', {
+    params: { q: query, limit: 25, ...(role ? { role } : {}) },
+  });
+  return res.data.data ?? [];
+}
+
+export async function fetchFilterMobileOptions(query: string, role?: string) {
+  const res = await api.get('/api/internal/filter-options/mobiles', {
+    params: { q: query, limit: 25, ...(role ? { role } : {}) },
+  });
+  return res.data.data ?? [];
 }
 
 export function formatCount(value: unknown) {

@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { FilterX, FileDown, FileSpreadsheet, X } from 'lucide-react';
 import api from '../../services/api';
 import DatePeriodFilter from './DatePeriodFilter';
 import RegionStateDistrictSelect from '../RegionStateDistrictSelect';
 import type { AuditActivityDetail, AuditFilters, AuditSummaryRecord } from '../../types/admin';
 import { defaultAuditFilters } from '../../types/admin';
-import { buildAuditParams, formatDateTime } from '../../utils/adminApi';
+import SearchableMultiSelect from './SearchableMultiSelect';
+import { buildAuditParams, fetchFilterMobileOptions, fetchFilterNameOptions, formatDateTime } from '../../utils/adminApi';
 
 interface Props {
   records: AuditSummaryRecord[];
@@ -39,6 +40,16 @@ const AuditLogsTab: React.FC<Props> = ({
   const update = <K extends keyof AuditFilters>(key: K, value: AuditFilters[K]) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
+
+  const loadNameOptions = useCallback(
+    (query: string) => fetchFilterNameOptions(query),
+    [],
+  );
+
+  const loadUserMobileOptions = useCallback(
+    (query: string) => fetchFilterMobileOptions(query),
+    [],
+  );
 
   const openDetails = async (record: AuditSummaryRecord) => {
     setSelectedUser(record);
@@ -75,26 +86,35 @@ const AuditLogsTab: React.FC<Props> = ({
           className="input-style-compact w-full"
         />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <input
-            type="text"
-            placeholder="Name"
-            value={filters.name}
-            onChange={(e) => update('name', e.target.value)}
-            className="input-style-compact"
+        <div className="flex flex-col lg:flex-row gap-4 flex-wrap">
+          <SearchableMultiSelect
+            label="Name"
+            placeholder="Search name..."
+            selected={filters.names}
+            onChange={(names) => update('names', names)}
+            loadOptions={loadNameOptions}
           />
-          <input
-            type="text"
-            placeholder="User Mobile"
-            value={filters.user}
-            onChange={(e) => update('user', e.target.value)}
-            className="input-style-compact"
+          <SearchableMultiSelect
+            label="User Mobile"
+            placeholder="Search user mobile..."
+            selected={filters.userMobiles}
+            onChange={(userMobiles) => update('userMobiles', userMobiles)}
+            loadOptions={loadUserMobileOptions}
           />
-          <select value={filters.eventType} onChange={(e) => update('eventType', e.target.value)} className="input-style-compact">
-            <option value="">All Event Types</option>
-            <option value="LOGIN">LOGIN</option>
-            <option value="LOGOUT">LOGOUT</option>
-          </select>
+          <div className="min-w-[180px] flex-1">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              Event Type
+            </label>
+            <select
+              value={filters.eventType}
+              onChange={(e) => update('eventType', e.target.value)}
+              className="input-style-compact w-full min-h-[42px] rounded-xl"
+            >
+              <option value="">All Event Types</option>
+              <option value="LOGIN">LOGIN</option>
+              <option value="LOGOUT">LOGOUT</option>
+            </select>
+          </div>
         </div>
 
         <RegionStateDistrictSelect

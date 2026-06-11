@@ -1,4 +1,5 @@
 import { excludedAnalyticsMobileNumbers, isExcludedAnalyticsMobile } from '../config/excludedAnalyticsUsers';
+import { parseArrayParam } from './dashboardAnalytics';
 import { normalizePeriod, resolvePeriodRange } from './datePeriod';
 
 export type SubmissionRow = {
@@ -53,7 +54,8 @@ export function toHourKey(date: Date) {
 
 export function parseFilterQuery(query: Record<string, unknown>) {
   const search = String(query.search || '').trim();
-  const user = String(query.user || '').trim();
+  const names = parseArrayParam(query.names ?? query.name);
+  const userMobiles = parseArrayParam(query.userMobiles ?? query.users ?? query.user);
   const regionId = String(query.regionId || '').trim();
   const stateId = String(query.stateId || '').trim();
   const districtId = String(query.districtId || '').trim();
@@ -66,7 +68,10 @@ export function parseFilterQuery(query: Record<string, unknown>) {
   const period = normalizePeriod(String(query.period || 'week'));
   const rankingSort = String(query.rankingSort || 'desc') === 'asc' ? 'asc' : 'desc';
 
-  return { search, user, regionId, stateId, districtId, sapCode, mobileNumber, singleDay, date, fromDate, toDate, period, rankingSort };
+  return {
+    search, names, userMobiles, regionId, stateId, districtId, sapCode, mobileNumber,
+    singleDay, date, fromDate, toDate, period, rankingSort,
+  };
 }
 
 export function buildDateRange(filters: ReturnType<typeof parseFilterQuery>) {
@@ -108,11 +113,11 @@ function salespersonScopedUserFilter(
 ) {
   const userFilter: Record<string, unknown> = { ...baseSalespersonUserFilter() };
 
-  if (filters.user) {
-    userFilter.OR = [
-      { mobileNumber: { contains: filters.user } },
-      { name: { contains: filters.user, mode: 'insensitive' } },
-    ];
+  if (filters.names.length) {
+    userFilter.name = { in: filters.names };
+  }
+  if (filters.userMobiles.length) {
+    userFilter.mobileNumber = { in: filters.userMobiles };
   }
   if (filters.districtId) {
     userFilter.districtId = filters.districtId;
@@ -127,7 +132,7 @@ function salespersonScopedUserFilter(
 
 export function buildSubmissionWhere(
   filters: ReturnType<typeof parseFilterQuery>,
-  options?: { regionStateIds?: string[] },
+  options?: { regionStateIds?: string[]; skipDate?: boolean },
 ) {
   const andClauses: Record<string, unknown>[] = [
     { user: salespersonScopedUserFilter(filters, options?.regionStateIds) },
@@ -136,8 +141,10 @@ export function buildSubmissionWhere(
   if (filters.sapCode) andClauses.push({ sapCode: { contains: filters.sapCode } });
   if (filters.mobileNumber) andClauses.push({ mobileNumber: { contains: filters.mobileNumber } });
 
-  const submittedAt = buildDateRange(filters);
-  if (submittedAt) andClauses.push({ submittedAt });
+  if (!options?.skipDate) {
+    const submittedAt = buildDateRange(filters);
+    if (submittedAt) andClauses.push({ submittedAt });
+  }
 
   if (filters.search) {
     const salesperson = baseSalespersonUserFilter();
@@ -159,9 +166,12 @@ export function buildSubmissionWhere(
 export async function fetchFilteredSubmissions(
   prisma: any,
   filters: ReturnType<typeof parseFilterQuery>,
-  options?: { regionStateIds?: string[]; scopeDistrictIds?: string[] },
+  options?: { regionStateIds?: string[]; scopeDistrictIds?: string[]; skipDate?: boolean },
 ) {
-  const where = buildSubmissionWhere(filters, { regionStateIds: options?.regionStateIds });
+  const where = buildSubmissionWhere(filters, {
+    regionStateIds: options?.regionStateIds,
+    skipDate: options?.skipDate,
+  });
   if (options?.scopeDistrictIds?.length) {
     const applyDistrictScope = (userWhere: Record<string, unknown>) => {
       if (userWhere.districtId) {

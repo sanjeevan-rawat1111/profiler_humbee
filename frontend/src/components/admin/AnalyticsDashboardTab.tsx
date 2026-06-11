@@ -1,24 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { RefreshCw, TrendingUp, Users, MapPin, UserX } from 'lucide-react';
-import api from '../../services/api';
-import SearchableMultiSelect from './SearchableMultiSelect';
-import RegionStateDistrictSelect from '../RegionStateDistrictSelect';
-import type { GeographyLevel } from '../../types/admin';
+import type { UnifiedDashboardData } from '../../types/admin';
 import RankedListPanel from './RankedListPanel';
-import ScrollableBarChart from './ScrollableBarChart';
-import type { GlobalDashboardFilters, UnifiedDashboardData, DashboardPeriod } from '../../types/admin';
-import { defaultGlobalDashboardFilters } from '../../types/admin';
-import { buildDashboardParams, formatCount, formatDateTime } from '../../utils/adminApi';
+import { formatCount, formatDateTime } from '../../utils/adminApi';
 
 const COLORS = ['#349688', '#f59e0b', '#3b82f6', '#8b5cf6', '#ef4444', '#06b6d4', '#10b981', '#f97316'];
-
-const PERIOD_OPTIONS: { id: DashboardPeriod; label: string }[] = [
-  { id: 'today', label: 'Today' },
-  { id: 'week', label: 'This Week' },
-  { id: 'month', label: 'This Month' },
-  { id: 'custom', label: 'Custom Range' },
-];
 
 const KpiCard: React.FC<{ icon: React.ReactNode; label: string; value: string | number; accent?: string }> = ({
   icon, label, value, accent = 'bg-humbee-50 text-humbee-700',
@@ -46,62 +33,85 @@ const ChartPanel: React.FC<{ title: string; children: React.ReactNode; className
   </div>
 );
 
-const AnalyticsDashboardTab: React.FC = () => {
-  const [filters, setFilters] = useState<GlobalDashboardFilters>(defaultGlobalDashboardFilters);
-  const [data, setData] = useState<UnifiedDashboardData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const ContributionPieChart: React.FC<{
+  data: { uniqueCount: number; percentage: number; label: string }[];
+  nameKey: string;
+}> = ({ data, nameKey }) => (
+  <ResponsiveContainer width="100%" height="100%">
+    <PieChart>
+      <Pie
+        data={data}
+        dataKey="uniqueCount"
+        nameKey={nameKey}
+        cx="50%"
+        cy="50%"
+        innerRadius={55}
+        outerRadius={90}
+        paddingAngle={2}
+      >
+        {data.map((_, i) => (
+          <Cell key={i} fill={COLORS[i % COLORS.length]} />
+        ))}
+      </Pie>
+      <Tooltip
+        formatter={(value, _name, props) => [
+          `${formatCount(value)} (${formatCount((props?.payload as { percentage?: number })?.percentage)}%)`,
+          (props?.payload as Record<string, string>)?.[nameKey] ?? '',
+        ]}
+      />
+      <Legend wrapperStyle={{ fontSize: 10 }} />
+    </PieChart>
+  </ResponsiveContainer>
+);
 
-  const fetchDashboard = useCallback(async (activeFilters: GlobalDashboardFilters) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.get('/api/internal/dashboard', { params: buildDashboardParams(activeFilters) });
-      setData(res.data.data ?? res.data);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch dashboard');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+interface Props {
+  data: UnifiedDashboardData | null;
+  loading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+}
 
-  useEffect(() => {
-    const timer = setTimeout(() => fetchDashboard(filters), 300);
-    return () => clearTimeout(timer);
-  }, [filters, fetchDashboard]);
-
-  const availableUsers = useMemo(() => {
-    if (!data) return [];
-    const { users } = data.filterOptions;
-    return users
-      .filter((u) => {
-        if (filters.regionId && data.filterOptions.states.find((s) => s.id === u.stateId)?.regionId !== filters.regionId) return false;
-        if (filters.stateId && u.stateId !== filters.stateId) return false;
-        if (filters.districtId && u.districtId !== filters.districtId) return false;
-        return true;
-      })
-      .map((u) => u.mobileNumber);
-  }, [data, filters.regionId, filters.stateId, filters.districtId]);
-
-  useEffect(() => {
-    if (!filters.users.length) return;
-    const valid = new Set(availableUsers);
-    const pruned = filters.users.filter((u) => valid.has(u));
-    if (pruned.length !== filters.users.length) {
-      setFilters((prev) => ({ ...prev, users: pruned }));
-    }
-  }, [availableUsers, filters.users]);
-
-  const setPeriod = (period: DashboardPeriod) => {
-    setFilters((prev) => ({
-      ...prev,
-      period,
-      ...(period !== 'custom' ? { fromDate: '', toDate: '' } : {}),
-    }));
-  };
+const AnalyticsDashboardTab: React.FC<Props> = ({
+  data,
+  loading,
+  error,
+  onRefresh,
+}) => {
+  const regionListItems = useMemo(
+    () => (data?.regions.totalChart ?? []).map((item) => ({ name: item.region, count: item.uniqueCount })),
+    [data],
+  );
 
   const stateListItems = useMemo(
     () => (data?.states.totalChart ?? []).map((item) => ({ name: item.state, count: item.uniqueCount })),
+    [data],
+  );
+
+  const regionPieData = useMemo(
+    () => (data?.regions.contribution ?? []).map((item) => ({
+      region: item.region,
+      uniqueCount: item.uniqueCount,
+      percentage: item.percentage,
+      label: item.region,
+    })),
+    [data],
+  );
+
+  const districtListItems = useMemo(
+    () => (data?.districts.totalChart ?? []).map((item) => ({
+      name: item.district,
+      count: item.uniqueCount,
+      state: item.state,
+    })),
+    [data],
+  );
+
+  const districtPieData = useMemo(
+    () => (data?.districts.contribution ?? []).map((item) => ({
+      label: item.label,
+      uniqueCount: item.uniqueCount,
+      percentage: item.percentage,
+    })),
     [data],
   );
 
@@ -122,108 +132,23 @@ const AnalyticsDashboardTab: React.FC = () => {
     [data],
   );
 
-  const hasScopeFilters = filters.regionId || filters.stateId || filters.districtId || filters.users.length > 0;
-
-  const GEO_LEVEL_OPTIONS: { id: GeographyLevel; label: string }[] = [
-    { id: 'region', label: 'Region' },
-    { id: 'state', label: 'State' },
-    { id: 'district', label: 'District' },
-  ];
-
   return (
     <div className="space-y-8 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Executive Dashboard</h2>
-          <p className="text-sm text-slate-500">Real-time submission analytics across states, districts, and users</p>
+          <h2 className="text-2xl font-bold text-slate-800">Dashboard</h2>
+          <p className="text-sm text-slate-500">Submission analytics for the selected filters</p>
           {data?.lastUpdated && (
             <p className="text-xs text-slate-400 mt-1">Last updated: {formatDateTime(data.lastUpdated)}</p>
           )}
         </div>
         <button
-          onClick={() => fetchDashboard(filters)}
+          onClick={onRefresh}
           className="px-3.5 py-2 border border-slate-200 hover:bg-slate-50 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer self-start"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </button>
-      </div>
-
-      <div className="sticky top-0 z-30 -mx-1 px-1 pt-1 pb-3 bg-[#f4f6f9]/95 backdrop-blur-md">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-4 space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">Period</span>
-            {PERIOD_OPTIONS.map((opt) => (
-              <button
-                key={opt.id}
-                onClick={() => setPeriod(opt.id)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                  filters.period === opt.id
-                    ? 'bg-humbee-600 text-white shadow-sm'
-                    : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-
-          {filters.period === 'custom' && (
-            <div className="flex flex-wrap gap-3">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">From</label>
-                <input
-                  type="date"
-                  value={filters.fromDate}
-                  onChange={(e) => setFilters((f) => ({ ...f, fromDate: e.target.value }))}
-                  className="input-style-compact"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">To</label>
-                <input
-                  type="date"
-                  value={filters.toDate}
-                  onChange={(e) => setFilters((f) => ({ ...f, toDate: e.target.value }))}
-                  className="input-style-compact"
-                />
-              </div>
-            </div>
-          )}
-
-          <RegionStateDistrictSelect
-            regionId={filters.regionId}
-            stateId={filters.stateId}
-            districtId={filters.districtId}
-            onChange={(regionId, stateId, districtId) => setFilters((f) => ({ ...f, regionId, stateId, districtId }))}
-          />
-
-          <SearchableMultiSelect
-            label="Mobile Number"
-            placeholder="Search mobile number..."
-            options={availableUsers}
-            selected={filters.users}
-            onChange={(users) => setFilters((f) => ({ ...f, users }))}
-            disabled={!data && loading}
-          />
-
-          {hasScopeFilters && (
-            <div className="flex items-center gap-2 text-[11px] text-slate-500">
-              <span className="font-semibold">Active filters:</span>
-              {filters.regionId && <span>Region selected</span>}
-              {filters.stateId && <span>State selected</span>}
-              {filters.districtId && <span>District selected</span>}
-              {filters.users.length > 0 && <span>{filters.users.length} user(s)</span>}
-              <button
-                type="button"
-                onClick={() => setFilters((f) => ({ ...f, regionId: '', stateId: '', districtId: '', users: [] }))}
-                className="text-humbee-700 font-semibold hover:underline cursor-pointer"
-              >
-                Reset filters
-              </button>
-            </div>
-          )}
-        </div>
       </div>
 
       {error && (
@@ -245,64 +170,22 @@ const AnalyticsDashboardTab: React.FC = () => {
           </section>
 
           <section>
-            <SectionHeader title="Top Performers" subtitle="Rankings for the selected period and filters" />
+            <SectionHeader title="Region Analytics" subtitle="Region-level performance and contribution" />
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm min-h-[420px]">
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                  <h4 className="text-sm font-bold text-slate-800">Top Geography Ranking</h4>
-                  <div className="flex rounded-lg border border-slate-200 overflow-hidden">
-                    {GEO_LEVEL_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setFilters((f) => ({ ...f, geoLevel: opt.id }))}
-                        className={`px-3 py-1.5 text-[11px] font-semibold transition-colors cursor-pointer ${
-                          filters.geoLevel === opt.id
-                            ? 'bg-humbee-600 text-white'
-                            : 'bg-white text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
+              <RankedListPanel
+                title="Region-wise Total Submissions"
+                items={regionListItems}
+                nameLabel="Region"
+                countLabel="Submissions"
+              />
+              <ChartPanel title="Region Contribution Distribution">
+                {regionPieData.length > 0 ? (
+                  <ContributionPieChart data={regionPieData} nameKey="region" />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                    No region data for selected filters
                   </div>
-                </div>
-                <div className="overflow-auto max-h-[340px]">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-slate-500 border-b border-slate-100">
-                        <th className="py-2 text-left">Rank</th>
-                        <th className="py-2 text-left">Geography</th>
-                        <th className="py-2 text-right">Submissions</th>
-                        <th className="py-2 text-right">Active Users</th>
-                        <th className="py-2 text-right">Contribution %</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {(data.topPerformers.geography ?? []).map((item) => (
-                        <tr key={`${item.rank}-${item.name}`}>
-                          <td className="py-2 font-bold text-slate-700">{item.rank}</td>
-                          <td className="py-2 text-slate-800">{item.name}</td>
-                          <td className="py-2 text-right font-semibold">{formatCount(item.totalSubmissions)}</td>
-                          <td className="py-2 text-right">{formatCount(item.activeUsers)}</td>
-                          <td className="py-2 text-right text-slate-500">{item.contributionPct}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {!data.topPerformers.geography?.length && (
-                    <div className="py-8 text-center text-slate-400">No ranking data for selected filters</div>
-                  )}
-                </div>
-              </div>
-              <ChartPanel title="Top Users Ranking" className="min-h-[420px]">
-                <ScrollableBarChart
-                  data={data.topPerformers.users.map((item) => ({
-                    label: item.name,
-                    value: item.totalSubmissions,
-                  }))}
-                  color="#8b5cf6"
-                />
+                )}
               </ChartPanel>
             </div>
           </section>
@@ -317,31 +200,43 @@ const AnalyticsDashboardTab: React.FC = () => {
                 countLabel="Submissions"
               />
               <ChartPanel title="State Contribution Distribution">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={data.states.contribution}
-                      dataKey="uniqueCount"
-                      nameKey="state"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={90}
-                      paddingAngle={2}
-                    >
-                      {data.states.contribution.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value, _name, props) => [
-                        `${formatCount(value)} (${formatCount((props?.payload as { percentage?: number })?.percentage)}%)`,
-                        (props?.payload as { state?: string })?.state ?? '',
-                      ]}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 10 }} />
-                  </PieChart>
-                </ResponsiveContainer>
+                {data.states.contribution.length > 0 ? (
+                  <ContributionPieChart
+                    data={data.states.contribution.map((item) => ({
+                      state: item.state,
+                      uniqueCount: item.uniqueCount,
+                      percentage: item.percentage,
+                      label: item.state,
+                    }))}
+                    nameKey="state"
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                    No state data for selected filters
+                  </div>
+                )}
+              </ChartPanel>
+            </div>
+          </section>
+
+          <section>
+            <SectionHeader title="District Analytics" subtitle="District-level performance and contribution" />
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <RankedListPanel
+                title="District-wise Total Submissions"
+                items={[]}
+                extendedItems={districtListItems}
+                nameLabel="District"
+                countLabel="Submissions"
+              />
+              <ChartPanel title="District Contribution Distribution">
+                {districtPieData.length > 0 ? (
+                  <ContributionPieChart data={districtPieData} nameKey="label" />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                    No district data for selected filters
+                  </div>
+                )}
               </ChartPanel>
             </div>
           </section>
@@ -356,31 +251,37 @@ const AnalyticsDashboardTab: React.FC = () => {
                 countLabel="Submissions"
               />
               <ChartPanel title="User Activity Distribution">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={data.users.activityDistribution.slice(0, 10)}
-                      dataKey="uniqueCount"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={90}
-                      paddingAngle={2}
-                    >
-                      {data.users.activityDistribution.slice(0, 10).map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value, _name, props) => [
-                        `${formatCount(value)} (${formatCount((props?.payload as { percentage?: number })?.percentage)}%)`,
-                        (props?.payload as { name?: string; mobileNumber?: string })?.name ?? '',
-                      ]}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 10 }} />
-                  </PieChart>
-                </ResponsiveContainer>
+                {data.users.activityDistribution.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={data.users.activityDistribution.slice(0, 10)}
+                        dataKey="uniqueCount"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={90}
+                        paddingAngle={2}
+                      >
+                        {data.users.activityDistribution.slice(0, 10).map((_, i) => (
+                          <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value, _name, props) => [
+                          `${formatCount(value)} (${formatCount((props?.payload as { percentage?: number })?.percentage)}%)`,
+                          (props?.payload as { name?: string })?.name ?? '',
+                        ]}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 10 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                    No user data for selected filters
+                  </div>
+                )}
               </ChartPanel>
             </div>
           </section>

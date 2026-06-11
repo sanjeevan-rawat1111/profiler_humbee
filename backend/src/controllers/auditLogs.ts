@@ -3,6 +3,7 @@ import prisma from '../prisma/client';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { excludedAnalyticsMobileNumbers } from '../config/excludedAnalyticsUsers';
 import { sendCsv, sendExcel } from '../utils/exportHelpers';
+import { parseArrayParam } from '../utils/dashboardAnalytics';
 import { parsePeriodQuery, periodToDateRange } from '../utils/datePeriod';
 import { GeographyScope, resolveRegionStateIds } from '../utils/geographyScope';
 
@@ -23,8 +24,8 @@ function formatStatus(status: string) {
 }
 
 async function buildAuditWhere(query: Record<string, unknown>, scope?: GeographyScope) {
-  const user = String(query.user || '').trim();
-  const name = String(query.name || '').trim();
+  const names = parseArrayParam(query.names ?? query.name);
+  const userMobiles = parseArrayParam(query.userMobiles ?? query.users ?? query.user);
   const search = String(query.search || '').trim();
   const regionId = String(query.regionId || '').trim();
   const stateId = String(query.stateId || '').trim();
@@ -46,11 +47,8 @@ async function buildAuditWhere(query: Record<string, unknown>, scope?: Geography
       ],
     });
   } else {
-    const identityClauses: Record<string, unknown>[] = [];
-    if (user) identityClauses.push({ username: { contains: user } });
-    if (name) identityClauses.push({ name: { contains: name, mode: 'insensitive' } });
-    if (identityClauses.length === 1) andClauses.push(identityClauses[0]);
-    if (identityClauses.length > 1) andClauses.push({ AND: identityClauses });
+    if (names.length) andClauses.push({ name: { in: names } });
+    if (userMobiles.length) andClauses.push({ username: { in: userMobiles } });
   }
 
   if (regionId) {

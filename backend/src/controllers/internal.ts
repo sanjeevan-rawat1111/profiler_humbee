@@ -53,9 +53,10 @@ function parseUserListQuery(query: Record<string, unknown>) {
   const stateId = String(query.stateId || '').trim();
   const districtId = String(query.districtId || '').trim();
   const role = String(query.role || '').trim();
+  const names = parseArrayParam(query.names ?? query.name);
   const mobileNumbers = parseArrayParam(query.mobileNumbers ?? query.users ?? query.user);
   const statuses = parseArrayParam(query.status ?? query.statuses).map((value) => value.toLowerCase());
-  return { regionId, stateId, districtId, role, mobileNumbers, statuses };
+  return { regionId, stateId, districtId, role, names, mobileNumbers, statuses };
 }
 
 async function buildUserListWhere(filters: ReturnType<typeof parseUserListQuery>) {
@@ -69,6 +70,7 @@ async function buildUserListWhere(filters: ReturnType<typeof parseUserListQuery>
     where.stateId = { in: regionStateIds.length ? regionStateIds : ['__none__'] };
   }
   if (filters.role) where.role = filters.role;
+  if (filters.names.length) where.name = { in: filters.names };
   if (filters.mobileNumbers.length) where.mobileNumber = { in: filters.mobileNumbers };
   if (filters.statuses.length) where.status = { in: filters.statuses };
   return where;
@@ -79,6 +81,65 @@ async function hashPassword(password: string): Promise<string> {
 }
 
 // ─── USERS ───────────────────────────────────────────────────────────────────
+
+function parseFilterOptionsQuery(query: Record<string, unknown>) {
+  const q = String(query.q || query.search || '').trim();
+  const role = String(query.role || '').trim();
+  const limit = Math.min(50, Math.max(1, parseInt(String(query.limit || '25'), 10)));
+  const where: Record<string, unknown> = {};
+  if (role) where.role = role;
+  return { q, where, limit };
+}
+
+export async function getFilterNameOptions(req: AuthenticatedRequest, res: Response) {
+  const { q, where, limit } = parseFilterOptionsQuery(req.query);
+
+  try {
+    if (q) where.name = { contains: q, mode: 'insensitive' };
+    const rows = await prisma.user.groupBy({
+      by: ['name'],
+      where,
+      orderBy: { name: 'asc' },
+      take: limit,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: rows.map((row) => row.name),
+    });
+  } catch (error) {
+    console.error('getFilterNameOptions error:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
+export async function getFilterMobileOptions(req: AuthenticatedRequest, res: Response) {
+  const { q, where, limit } = parseFilterOptionsQuery(req.query);
+
+  try {
+    if (q) where.mobileNumber = { contains: q };
+    const rows = await prisma.user.findMany({
+      where,
+      select: { mobileNumber: true },
+      distinct: ['mobileNumber'],
+      orderBy: { mobileNumber: 'asc' },
+      take: limit,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: rows.map((row) => row.mobileNumber),
+    });
+  } catch (error) {
+    console.error('getFilterMobileOptions error:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
+
+/** @deprecated Use getFilterNameOptions */
+export async function getUserNameOptions(req: AuthenticatedRequest, res: Response) {
+  return getFilterNameOptions(req, res);
+}
 
 export async function getUsers(req: AuthenticatedRequest, res: Response) {
   const filters = parseUserListQuery(req.query);
@@ -402,7 +463,7 @@ function toDateKey(date: Date) {
 }
 
 export async function getSubmissions(req: AuthenticatedRequest, res: Response) {
-  const { sapCode, mobile, mobileNumber, date, user, sort = 'desc' } = req.query;
+  const { sapCode, mobile, mobileNumber, date, user, name, sort = 'desc' } = req.query;
   const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '20'), 10)));
   const skip = (page - 1) * limit;
@@ -414,14 +475,10 @@ export async function getSubmissions(req: AuthenticatedRequest, res: Response) {
     if (mobileFilter) where.mobileNumber = { contains: String(mobileFilter) };
     const submittedAt = parseDateRange(date);
     if (submittedAt) where.submittedAt = submittedAt;
-    where.user = user
-      ? {
-          AND: [
-            baseSalespersonUserFilter(),
-            { mobileNumber: { contains: String(user) } },
-          ],
-        }
-      : baseSalespersonUserFilter();
+    const userClauses: Record<string, unknown>[] = [baseSalespersonUserFilter()];
+    if (user) userClauses.push({ mobileNumber: { contains: String(user) } });
+    if (name) userClauses.push({ name: { contains: String(name), mode: 'insensitive' } });
+    where.user = userClauses.length === 1 ? userClauses[0] : { AND: userClauses };
 
     const [total, submissions] = await prisma.$transaction([
       prisma.submission.count({ where }),
@@ -584,7 +641,7 @@ export async function getSubmissionKpis(req: AuthenticatedRequest, res: Response
 }
 
 export async function exportSubmissions(req: AuthenticatedRequest, res: Response) {
-  const { sapCode, mobile, mobileNumber, date, user } = req.query;
+  const { sapCode, mobile, mobileNumber, date, user, name } = req.query;
   const mobileFilter = (mobile || mobileNumber) as string | undefined;
 
   try {
@@ -593,14 +650,10 @@ export async function exportSubmissions(req: AuthenticatedRequest, res: Response
     if (mobileFilter) where.mobileNumber = { contains: String(mobileFilter) };
     const submittedAt = parseDateRange(date);
     if (submittedAt) where.submittedAt = submittedAt;
-    where.user = user
-      ? {
-          AND: [
-            baseSalespersonUserFilter(),
-            { mobileNumber: { contains: String(user) } },
-          ],
-        }
-      : baseSalespersonUserFilter();
+    const userClauses: Record<string, unknown>[] = [baseSalespersonUserFilter()];
+    if (user) userClauses.push({ mobileNumber: { contains: String(user) } });
+    if (name) userClauses.push({ name: { contains: String(name), mode: 'insensitive' } });
+    where.user = userClauses.length === 1 ? userClauses[0] : { AND: userClauses };
 
     const submissions = await prisma.submission.findMany({
       where,

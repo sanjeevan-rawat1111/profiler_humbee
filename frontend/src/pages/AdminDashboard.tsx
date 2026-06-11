@@ -17,6 +17,7 @@ import type {
   DBUser,
   UserManagementFilters,
   AuditFilters,
+  UnifiedDashboardData,
 } from '../types/admin';
 import { buildAuditParams, buildFilterParams, buildUserMgmtParams, downloadExport } from '../utils/adminApi';
 
@@ -50,7 +51,9 @@ const AdminDashboard: React.FC = () => {
   const [loadingAudit, setLoadingAudit] = useState(false);
   const [auditFilters, setAuditFilters] = useState<AuditFilters>(defaultAuditFilters);
 
-  const [submissionUserOptions, setSubmissionUserOptions] = useState<{ name: string; mobileNumber: string }[]>([]);
+  const [dashboardData, setDashboardData] = useState<UnifiedDashboardData | null>(null);
+  const [loadingDashboard, setLoadingDashboard] = useState(false);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchDirectory = useCallback(async () => {
@@ -63,9 +66,6 @@ const AdminDashboard: React.FC = () => {
       const data = res.data.data ?? res.data;
       setDirectoryRecords(data.records || []);
       setDirectoryTotal(data.pagination?.total || 0);
-      if (data.filterOptions?.users) {
-        setSubmissionUserOptions(data.filterOptions.users);
-      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch directory');
     } finally {
@@ -109,11 +109,30 @@ const AdminDashboard: React.FC = () => {
     }
   }, [auditFilters, auditPage]);
 
+  const fetchDashboard = useCallback(async () => {
+    setLoadingDashboard(true);
+    setDashboardError(null);
+    try {
+      const res = await api.get('/api/internal/dashboard', {
+        params: buildFilterParams(filters),
+      });
+      setDashboardData(res.data.data ?? res.data);
+    } catch (err: any) {
+      setDashboardError(err.response?.data?.message || 'Failed to fetch dashboard');
+    } finally {
+      setLoadingDashboard(false);
+    }
+  }, [filters]);
+
   const fetchSubmissionData = () => {
-    fetchDirectory();
+    if (submissionTab === 'kpi') {
+      fetchDashboard();
+    } else {
+      fetchDirectory();
+    }
   };
 
-  const clearFilters = () => {
+  const clearSubmissionFilters = () => {
     setFilters(defaultFilters);
     setDirectoryPage(1);
   };
@@ -128,12 +147,12 @@ const AdminDashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    if (mainTab === 'submissions') {
-      fetchSubmissionData();
+    if (mainTab === 'submissions' && submissionTab === 'directory') {
+      fetchDirectory();
     } else if (mainTab === 'audit') {
       fetchAuditLogs();
     }
-  }, [mainTab]);
+  }, [mainTab, submissionTab]);
 
   useEffect(() => {
     if (mainTab !== 'management' || managementSubTab !== 'users') return;
@@ -146,6 +165,12 @@ const AdminDashboard: React.FC = () => {
       fetchDirectory();
     }
   }, [directoryPage, sortBy, sortDir]);
+
+  useEffect(() => {
+    if (mainTab !== 'submissions' || submissionTab !== 'kpi') return;
+    const timer = setTimeout(() => fetchDashboard(), 300);
+    return () => clearTimeout(timer);
+  }, [mainTab, submissionTab, filters, fetchDashboard]);
 
   useEffect(() => {
     if (mainTab === 'audit') fetchAuditLogs();
@@ -169,33 +194,31 @@ const AdminDashboard: React.FC = () => {
         <div className="space-y-6">
           {submissionTab === 'directory' && (
             <div>
-              <h2 className="text-2xl font-bold text-slate-800">Submission Logs</h2>
+              <h2 className="text-2xl font-bold text-slate-800">Logs</h2>
               <p className="text-sm text-slate-500 mb-4">VCP profile submissions from salespersons only</p>
             </div>
           )}
 
-          {submissionTab === 'directory' && (
-            <SubmissionFiltersBar
-              filters={filters}
-              setFilters={setFilters}
-              users={submissionUserOptions}
-              loading={loadingDirectory}
-              downloadMode={downloadMode}
-              onDownloadModeChange={setDownloadMode}
-              onClear={clearFilters}
-              onFetch={fetchSubmissionData}
-              onExportCsv={() => downloadExport(
-                '/api/internal/submissions/export-csv',
-                'user-directory.csv',
-                buildFilterParams(filters, { sortBy, sortDir, downloadMode })
-              )}
-              onExportExcel={() => downloadExport(
-                '/api/internal/submissions/export-excel',
-                'user-directory.xls',
-                buildFilterParams(filters, { sortBy, sortDir, downloadMode })
-              )}
-            />
-          )}
+          <SubmissionFiltersBar
+            mode={submissionTab === 'kpi' ? 'dashboard' : 'logs'}
+            filters={filters}
+            setFilters={setFilters}
+            loading={submissionTab === 'kpi' ? loadingDashboard : loadingDirectory}
+            downloadMode={downloadMode}
+            onDownloadModeChange={setDownloadMode}
+            onClear={clearSubmissionFilters}
+            onFetch={fetchSubmissionData}
+            onExportCsv={() => downloadExport(
+              '/api/internal/submissions/export-csv',
+              'user-directory.csv',
+              buildFilterParams(filters, { sortBy, sortDir, downloadMode })
+            )}
+            onExportExcel={() => downloadExport(
+              '/api/internal/submissions/export-excel',
+              'user-directory.xls',
+              buildFilterParams(filters, { sortBy, sortDir, downloadMode })
+            )}
+          />
 
           {submissionTab === 'directory' ? (
             <UserDirectoryTab
@@ -210,7 +233,12 @@ const AdminDashboard: React.FC = () => {
               onPageChange={setDirectoryPage}
             />
           ) : (
-            <AnalyticsDashboardTab />
+            <AnalyticsDashboardTab
+              data={dashboardData}
+              loading={loadingDashboard}
+              error={dashboardError}
+              onRefresh={fetchDashboard}
+            />
           )}
         </div>
       )}

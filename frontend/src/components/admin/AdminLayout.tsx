@@ -54,7 +54,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
                 }`}
               >
                 <List className="w-3.5 h-3.5" />
-                Submission Logs
+                Logs
               </button>
               <button
                 onClick={() => onSubmissionTabChange('kpi')}
@@ -63,7 +63,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
                 }`}
               >
                 <LayoutDashboard className="w-3.5 h-3.5" />
-                KPI Dashboard
+                Dashboard
               </button>
             </div>
           )}
