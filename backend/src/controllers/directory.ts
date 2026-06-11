@@ -12,7 +12,8 @@ type DirectoryRow = {
   userId: string;
   userName: string;
   userMobileNumber: string;
-  region: string;
+  state: string;
+  district: string;
   sapCode: string;
   mobileNumber: string;
   submissionCount: number;
@@ -25,7 +26,8 @@ function aggregateDirectory(rows: SubmissionRow[]): DirectoryRow[] {
     userId: string;
     userName: string;
     userMobileNumber: string;
-    region: string;
+    state: string;
+    district: string;
     sapCode: string;
     mobileNumber: string;
     submissions: SubmissionRow[];
@@ -39,7 +41,8 @@ function aggregateDirectory(rows: SubmissionRow[]): DirectoryRow[] {
         userId: row.userId,
         userName: row.user.name,
         userMobileNumber: row.user.mobileNumber,
-        region: row.user.region,
+        state: row.user.state,
+        district: row.user.district,
         sapCode: row.sapCode,
         mobileNumber: row.mobileNumber,
         submissions: [],
@@ -56,7 +59,8 @@ function aggregateDirectory(rows: SubmissionRow[]): DirectoryRow[] {
       userId: data.userId,
       userName: data.userName,
       userMobileNumber: data.userMobileNumber,
-      region: data.region,
+      state: data.state,
+      district: data.district,
       sapCode: data.sapCode,
       mobileNumber: data.mobileNumber,
       submissionCount: sorted.length,
@@ -69,7 +73,8 @@ function aggregateDirectory(rows: SubmissionRow[]): DirectoryRow[] {
 type MasterRow = {
   userName: string;
   userMobileNumber: string;
-  region: string;
+  state: string;
+  district: string;
   sapCode: string;
   mobileNumber: string;
   timestamp: string;
@@ -81,7 +86,8 @@ function buildMasterRows(rows: SubmissionRow[]): MasterRow[] {
     .map((row) => ({
       userName: row.user!.name,
       userMobileNumber: row.user!.mobileNumber,
-      region: row.user!.region,
+      state: row.user!.state,
+      district: row.user!.district,
       sapCode: row.sapCode,
       mobileNumber: row.mobileNumber,
       timestamp: row.submittedAt.toISOString(),
@@ -100,8 +106,11 @@ function sortMasterRows(rows: MasterRow[], sortBy: string, sortDir: string) {
       case 'userMobileNumber':
         cmp = a.userMobileNumber.localeCompare(b.userMobileNumber);
         break;
-      case 'region':
-        cmp = a.region.localeCompare(b.region);
+      case 'state':
+        cmp = a.state.localeCompare(b.state);
+        break;
+      case 'district':
+        cmp = a.district.localeCompare(b.district);
         break;
       case 'sapCode':
         cmp = a.sapCode.localeCompare(b.sapCode);
@@ -131,8 +140,11 @@ function sortDirectory(rows: DirectoryRow[], sortBy: string, sortDir: string) {
       case 'userMobileNumber':
         cmp = a.userMobileNumber.localeCompare(b.userMobileNumber);
         break;
-      case 'region':
-        cmp = a.region.localeCompare(b.region);
+      case 'state':
+        cmp = a.state.localeCompare(b.state);
+        break;
+      case 'district':
+        cmp = a.district.localeCompare(b.district);
         break;
       case 'sapCode':
         cmp = a.sapCode.localeCompare(b.sapCode);
@@ -223,8 +235,8 @@ export async function exportDirectoryCsv(req: Request, res: Response) {
       return sendCsv(
         res,
         'user-directory.csv',
-        ['Name', 'User Mobile', 'Region', 'SAP Code', 'VCP Mobile', 'Timestamp'],
-        rows.map((r) => [r.userName, r.userMobileNumber, r.region, r.sapCode, r.mobileNumber, r.timestamp])
+        ['Name', 'User Mobile', 'State', 'District', 'SAP Code', 'VCP Mobile', 'Timestamp'],
+        rows.map((r) => [r.userName, r.userMobileNumber, r.state, r.district, r.sapCode, r.mobileNumber, r.timestamp])
       );
     }
 
@@ -232,8 +244,8 @@ export async function exportDirectoryCsv(req: Request, res: Response) {
     return sendCsv(
       res,
       'user-directory.csv',
-      ['Name', 'User Mobile', 'Region', 'SAP Code', 'VCP Mobile', 'Submission Count', 'First Submission', 'Last Submission'],
-      rows.map((r) => [r.userName, r.userMobileNumber, r.region, r.sapCode, r.mobileNumber, r.submissionCount, r.firstSubmission, r.lastSubmission])
+      ['Name', 'User Mobile', 'State', 'District', 'SAP Code', 'VCP Mobile', 'Submission Count', 'First Submission', 'Last Submission'],
+      rows.map((r) => [r.userName, r.userMobileNumber, r.state, r.district, r.sapCode, r.mobileNumber, r.submissionCount, r.firstSubmission, r.lastSubmission])
     );
   } catch (error) {
     console.error('exportDirectoryCsv error:', error);
@@ -254,8 +266,8 @@ export async function exportDirectoryExcel(req: Request, res: Response) {
       return sendExcel(
         res,
         'user-directory.xls',
-        ['Name', 'User Mobile', 'Region', 'SAP Code', 'VCP Mobile', 'Timestamp'],
-        rows.map((r) => [r.userName, r.userMobileNumber, r.region, r.sapCode, r.mobileNumber, r.timestamp])
+        ['Name', 'User Mobile', 'State', 'District', 'SAP Code', 'VCP Mobile', 'Timestamp'],
+        rows.map((r) => [r.userName, r.userMobileNumber, r.state, r.district, r.sapCode, r.mobileNumber, r.timestamp])
       );
     }
 
@@ -263,8 +275,8 @@ export async function exportDirectoryExcel(req: Request, res: Response) {
     return sendExcel(
       res,
       'user-directory.xls',
-      ['Name', 'User Mobile', 'Region', 'SAP Code', 'VCP Mobile', 'Submission Count', 'First Submission', 'Last Submission'],
-      rows.map((r) => [r.userName, r.userMobileNumber, r.region, r.sapCode, r.mobileNumber, r.submissionCount, r.firstSubmission, r.lastSubmission])
+      ['Name', 'User Mobile', 'State', 'District', 'SAP Code', 'VCP Mobile', 'Submission Count', 'First Submission', 'Last Submission'],
+      rows.map((r) => [r.userName, r.userMobileNumber, r.state, r.district, r.sapCode, r.mobileNumber, r.submissionCount, r.firstSubmission, r.lastSubmission])
     );
   } catch (error) {
     console.error('exportDirectoryExcel error:', error);

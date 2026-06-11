@@ -19,7 +19,8 @@ interface Props {
 const sortableColumns = [
   { key: 'userName', label: 'Name' },
   { key: 'userMobileNumber', label: 'User Mobile' },
-  { key: 'region', label: 'Region' },
+  { key: 'state', label: 'State' },
+  { key: 'district', label: 'District' },
   { key: 'sapCode', label: 'SAP Code' },
   { key: 'mobileNumber', label: 'VCP Mobile' },
   { key: 'submissionCount', label: 'Submission Count' },
@@ -98,7 +99,8 @@ const UserDirectoryTab: React.FC<Props> = ({
                   >
                     <td className="p-4 font-bold text-slate-800">{record.userName}</td>
                     <td className="p-4 font-mono text-slate-700">{record.userMobileNumber}</td>
-                    <td className="p-4 text-slate-600">{record.region}</td>
+                    <td className="p-4 text-slate-600">{record.state}</td>
+                    <td className="p-4 text-slate-600">{record.district}</td>
                     <td className="p-4 font-mono text-humbee-600">{record.sapCode}</td>
                     <td className="p-4 font-mono">{record.mobileNumber}</td>
                     <td className="p-4 font-bold">{record.submissionCount}</td>
@@ -143,6 +145,11 @@ const UserDirectoryTab: React.FC<Props> = ({
                 </p>
                 <p className="text-sm text-slate-500">
                   User Mobile: <span className="font-mono font-semibold text-slate-700">{selectedUser.userMobileNumber}</span>
+                </p>
+                <p className="text-sm text-slate-500">
+                  State: <span className="font-semibold text-slate-700">{selectedUser.state || '—'}</span>
+                  {' · '}
+                  District: <span className="font-semibold text-slate-700">{selectedUser.district || '—'}</span>
                 </p>
                 <p className="text-sm text-slate-500">
                   SAP Code: <span className="font-mono font-semibold text-humbee-600">{selectedUser.sapCode}</span>

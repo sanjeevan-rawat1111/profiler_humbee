@@ -71,9 +71,14 @@ const AnalyticsDashboardTab: React.FC = () => {
   const availableUsers = useMemo(() => {
     if (!data) return [];
     const { users } = data.filterOptions;
-    if (!filters.regions.length) return users.map((u) => u.mobileNumber);
-    return users.filter((u) => filters.regions.includes(u.region)).map((u) => u.mobileNumber);
-  }, [data, filters.regions]);
+    return users
+      .filter((u) => {
+        if (filters.states.length && !filters.states.includes(u.state)) return false;
+        if (filters.districts.length && !filters.districts.includes(u.district)) return false;
+        return true;
+      })
+      .map((u) => u.mobileNumber);
+  }, [data, filters.states, filters.districts]);
 
   useEffect(() => {
     if (!filters.users.length) return;
@@ -92,8 +97,8 @@ const AnalyticsDashboardTab: React.FC = () => {
     }));
   };
 
-  const regionListItems = useMemo(
-    () => (data?.regions.totalChart ?? []).map((item) => ({ name: item.region, count: item.uniqueCount })),
+  const stateListItems = useMemo(
+    () => (data?.states.totalChart ?? []).map((item) => ({ name: item.state, count: item.uniqueCount })),
     [data],
   );
 
@@ -107,18 +112,21 @@ const AnalyticsDashboardTab: React.FC = () => {
       name: item.name,
       mobileNumber: item.mobileNumber,
       count: 0,
-      region: item.region,
+      state: item.state,
+      district: item.district,
       lastSubmission: item.lastSubmission,
     })),
     [data],
   );
+
+  const hasScopeFilters = filters.states.length > 0 || filters.districts.length > 0 || filters.users.length > 0;
 
   return (
     <div className="space-y-8 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Executive Dashboard</h2>
-          <p className="text-sm text-slate-500">Real-time submission analytics across regions and users</p>
+          <p className="text-sm text-slate-500">Real-time submission analytics across states, districts, and users</p>
           {data?.lastUpdated && (
             <p className="text-xs text-slate-400 mt-1">Last updated: {formatDateTime(data.lastUpdated)}</p>
           )}
@@ -176,11 +184,19 @@ const AnalyticsDashboardTab: React.FC = () => {
 
           <div className="flex flex-col lg:flex-row gap-4">
             <SearchableMultiSelect
-              label="Regions"
-              placeholder="Type region name..."
-              options={data?.filterOptions.regions ?? []}
-              selected={filters.regions}
-              onChange={(regions) => setFilters((f) => ({ ...f, regions }))}
+              label="States"
+              placeholder="Type state name..."
+              options={data?.filterOptions.states ?? []}
+              selected={filters.states}
+              onChange={(states) => setFilters((f) => ({ ...f, states }))}
+              disabled={!data && loading}
+            />
+            <SearchableMultiSelect
+              label="Districts"
+              placeholder="Type district name..."
+              options={data?.filterOptions.districts ?? []}
+              selected={filters.districts}
+              onChange={(districts) => setFilters((f) => ({ ...f, districts }))}
               disabled={!data && loading}
             />
             <SearchableMultiSelect
@@ -193,14 +209,15 @@ const AnalyticsDashboardTab: React.FC = () => {
             />
           </div>
 
-          {(filters.regions.length > 0 || filters.users.length > 0) && (
+          {hasScopeFilters && (
             <div className="flex items-center gap-2 text-[11px] text-slate-500">
               <span className="font-semibold">Active filters:</span>
-              {filters.regions.length > 0 && <span>{filters.regions.length} region(s)</span>}
+              {filters.states.length > 0 && <span>{filters.states.length} state(s)</span>}
+              {filters.districts.length > 0 && <span>{filters.districts.length} district(s)</span>}
               {filters.users.length > 0 && <span>{filters.users.length} user(s)</span>}
               <button
                 type="button"
-                onClick={() => setFilters((f) => ({ ...f, regions: [], users: [] }))}
+                onClick={() => setFilters((f) => ({ ...f, states: [], districts: [], users: [] }))}
                 className="text-humbee-700 font-semibold hover:underline cursor-pointer"
               >
                 Reset filters
@@ -223,7 +240,7 @@ const AnalyticsDashboardTab: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               <KpiCard icon={<TrendingUp className="w-5 h-5" />} label="Total Submissions" value={data.summary.totalSubmissions} />
               <KpiCard icon={<Users className="w-5 h-5" />} label="Active Users" value={data.summary.activeUsers} accent="bg-blue-50 text-blue-700" />
-              <KpiCard icon={<MapPin className="w-5 h-5" />} label="Active Regions" value={data.summary.activeRegions} accent="bg-violet-50 text-violet-700" />
+              <KpiCard icon={<MapPin className="w-5 h-5" />} label="Active States" value={data.summary.activeStates} accent="bg-violet-50 text-violet-700" />
               <KpiCard icon={<UserX className="w-5 h-5" />} label="Inactive Users" value={data.summary.inactiveUsers} accent="bg-red-50 text-red-700" />
             </div>
           </section>
@@ -231,10 +248,10 @@ const AnalyticsDashboardTab: React.FC = () => {
           <section>
             <SectionHeader title="Top Performers" subtitle="Rankings for the selected period and filters" />
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              <ChartPanel title="Top Regions Ranking" className="min-h-[420px]">
+              <ChartPanel title="Top States Ranking" className="min-h-[420px]">
                 <ScrollableBarChart
-                  data={data.topPerformers.regions.map((item) => ({
-                    label: item.region,
+                  data={data.topPerformers.states.map((item) => ({
+                    label: item.state,
                     value: item.totalSubmissions,
                   }))}
                   color="#3b82f6"
@@ -253,35 +270,35 @@ const AnalyticsDashboardTab: React.FC = () => {
           </section>
 
           <section>
-            <SectionHeader title="Region Analytics" subtitle="Regional performance and contribution" />
+            <SectionHeader title="State Analytics" subtitle="State-level performance and contribution" />
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               <RankedListPanel
-                title="Region-wise Total Submissions"
-                items={regionListItems}
-                nameLabel="Region Name"
+                title="State-wise Total Submissions"
+                items={stateListItems}
+                nameLabel="State"
                 countLabel="Submissions"
               />
-              <ChartPanel title="Region Contribution Distribution">
+              <ChartPanel title="State Contribution Distribution">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={data.regions.contribution}
+                      data={data.states.contribution}
                       dataKey="uniqueCount"
-                      nameKey="region"
+                      nameKey="state"
                       cx="50%"
                       cy="50%"
                       innerRadius={55}
                       outerRadius={90}
                       paddingAngle={2}
                     >
-                      {data.regions.contribution.map((_, i) => (
+                      {data.states.contribution.map((_, i) => (
                         <Cell key={i} fill={COLORS[i % COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip
                       formatter={(value, _name, props) => [
                         `${formatCount(value)} (${formatCount((props?.payload as { percentage?: number })?.percentage)}%)`,
-                        (props?.payload as { region?: string })?.region ?? '',
+                        (props?.payload as { state?: string })?.state ?? '',
                       ]}
                     />
                     <Legend wrapperStyle={{ fontSize: 10 }} />
@@ -336,9 +353,9 @@ const AnalyticsDashboardTab: React.FC = () => {
               title="Inactive Users List"
               items={[]}
               extendedItems={inactiveListItems}
-              nameLabel="Mobile Number"
+              nameLabel="Name"
               showLastSubmission
-              showRegionColumn
+              showLocationColumns
               highlightTop
             />
           </section>

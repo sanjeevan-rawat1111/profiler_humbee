@@ -11,8 +11,14 @@ interface RankedListPanelProps {
   defaultSort?: SortOrder;
   highlightTop?: boolean;
   showLastSubmission?: boolean;
-  showRegionColumn?: boolean;
-  extendedItems?: { name: string; count: number; region?: string; lastSubmission?: string | null }[];
+  showLocationColumns?: boolean;
+  extendedItems?: {
+    name: string;
+    count: number;
+    state?: string;
+    district?: string;
+    lastSubmission?: string | null;
+  }[];
 }
 
 const RankedListPanel: React.FC<RankedListPanelProps> = ({
@@ -23,13 +29,18 @@ const RankedListPanel: React.FC<RankedListPanelProps> = ({
   defaultSort = 'desc',
   highlightTop = false,
   showLastSubmission = false,
-  showRegionColumn = false,
+  showLocationColumns = false,
   extendedItems,
 }) => {
   const [sortOrder, setSortOrder] = useState<SortOrder>(defaultSort);
 
   const rows = useMemo(() => {
-    const source = extendedItems ?? items.map((item) => ({ ...item, region: undefined, lastSubmission: undefined }));
+    const source = extendedItems ?? items.map((item) => ({
+      ...item,
+      state: undefined,
+      district: undefined,
+      lastSubmission: undefined,
+    }));
     const sorted = [...source].sort((a, b) => {
       if (showLastSubmission) {
         const aTime = a.lastSubmission ? new Date(a.lastSubmission).getTime() : 0;
@@ -40,6 +51,10 @@ const RankedListPanel: React.FC<RankedListPanelProps> = ({
     });
     return sorted.map((item, index) => ({ ...item, rank: index + 1 }));
   }, [items, extendedItems, sortOrder, showLastSubmission]);
+
+  const gridCols = showLocationColumns
+    ? 'grid-cols-[48px_1fr_1fr_1fr_auto]'
+    : 'grid-cols-[48px_1fr_auto]';
 
   return (
     <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm h-full flex flex-col overflow-hidden">
@@ -60,12 +75,11 @@ const RankedListPanel: React.FC<RankedListPanelProps> = ({
         )}
       </div>
 
-      <div className={`grid gap-2 px-2 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 ${
-        showRegionColumn ? 'grid-cols-[48px_1fr_1fr_auto]' : 'grid-cols-[48px_1fr_auto]'
-      }`}>
+      <div className={`grid gap-2 px-2 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 ${gridCols}`}>
         <span>Rank</span>
         <span>{nameLabel}</span>
-        {showRegionColumn && <span>Assigned Region</span>}
+        {showLocationColumns && <span>State</span>}
+        {showLocationColumns && <span>District</span>}
         <span className="text-right">{showLastSubmission ? 'Last Submission' : countLabel}</span>
       </div>
 
@@ -76,19 +90,24 @@ const RankedListPanel: React.FC<RankedListPanelProps> = ({
           rows.map((row) => (
             <div
               key={`${row.name}-${row.rank}`}
-              className={`grid gap-2 items-center px-2 py-2.5 border-b border-slate-50 text-xs ${
-                showRegionColumn ? 'grid-cols-[48px_1fr_1fr_auto]' : 'grid-cols-[48px_1fr_auto]'
-              } ${highlightTop && row.rank <= 3 ? 'bg-amber-50/60' : 'hover:bg-slate-50'}`}
+              className={`grid gap-2 items-center px-2 py-2.5 border-b border-slate-50 text-xs ${gridCols} ${
+                highlightTop && row.rank <= 3 ? 'bg-amber-50/60' : 'hover:bg-slate-50'
+              }`}
             >
               <span className="font-bold text-slate-400">#{row.rank}</span>
               <div className="min-w-0">
                 <div className="font-semibold text-slate-800 truncate">{row.name}</div>
-                {!showRegionColumn && row.region && (
-                  <div className="text-[10px] text-slate-400 truncate">{row.region}</div>
+                {!showLocationColumns && (row.state || row.district) && (
+                  <div className="text-[10px] text-slate-400 truncate">
+                    {[row.state, row.district].filter(Boolean).join(' / ')}
+                  </div>
                 )}
               </div>
-              {showRegionColumn && (
-                <span className="text-slate-600 truncate">{row.region || '—'}</span>
+              {showLocationColumns && (
+                <span className="text-slate-600 truncate">{row.state || '—'}</span>
+              )}
+              {showLocationColumns && (
+                <span className="text-slate-600 truncate">{row.district || '—'}</span>
               )}
               <span className={`text-right ${showLastSubmission ? 'text-slate-600' : 'font-mono text-humbee-700'}`}>
                 {showLastSubmission

@@ -6,6 +6,8 @@ export async function recordAuditLog(params: {
   username: string;
   name?: string | null;
   region?: string | null;
+  state?: string | null;
+  district?: string | null;
   eventType: 'LOGIN' | 'LOGOUT';
   status: 'SUCCESS' | 'FAIL';
   reason?: string | null;
@@ -18,7 +20,9 @@ export async function recordAuditLog(params: {
         userId: params.userId ?? null,
         username: params.username,
         name: params.name ?? null,
-        region: params.region ?? null,
+        region: params.region ?? params.state ?? null,
+        state: params.state ?? params.region ?? null,
+        district: params.district ?? null,
         eventType: params.eventType,
         status: params.status,
         reason: params.reason ?? null,

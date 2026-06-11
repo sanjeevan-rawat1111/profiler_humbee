@@ -7,7 +7,7 @@ export type SubmissionRow = {
   mobileNumber: string;
   submittedAt: Date;
   userId: string;
-  user: { name: string; mobileNumber: string; role: string; region: string } | null;
+  user: { name: string; mobileNumber: string; role: string; region: string; state: string; district: string } | null;
 };
 
 export function isAnalyticsUser(row: SubmissionRow) {
@@ -34,7 +34,9 @@ export function toHourKey(date: Date) {
 export function parseFilterQuery(query: Record<string, unknown>) {
   const search = String(query.search || '').trim();
   const user = String(query.user || '').trim();
-  const region = String(query.region || '').trim();
+  const state = String(query.state || query.region || '').trim();
+  const district = String(query.district || '').trim();
+  const region = state;
   const sapCode = String(query.sapCode || '').trim();
   const mobileNumber = String(query.mobileNumber || query.mobile || '').trim();
   const singleDay = query.singleDay === 'true' || query.singleDay === true;
@@ -44,7 +46,7 @@ export function parseFilterQuery(query: Record<string, unknown>) {
   const period = normalizePeriod(String(query.period || 'week'));
   const rankingSort = String(query.rankingSort || 'desc') === 'asc' ? 'asc' : 'desc';
 
-  return { search, user, region, sapCode, mobileNumber, singleDay, date, fromDate, toDate, period, rankingSort };
+  return { search, user, state, district, region, sapCode, mobileNumber, singleDay, date, fromDate, toDate, period, rankingSort };
 }
 
 export function buildDateRange(filters: ReturnType<typeof parseFilterQuery>) {
@@ -84,7 +86,7 @@ export function buildSubmissionWhere(filters: ReturnType<typeof parseFilterQuery
   const where: Record<string, unknown> = {};
   if (filters.sapCode) where.sapCode = { contains: filters.sapCode };
   if (filters.mobileNumber) where.mobileNumber = { contains: filters.mobileNumber };
-  if (filters.user || filters.region) {
+  if (filters.user || filters.state || filters.district) {
     const userFilter: Record<string, unknown> = {};
     if (filters.user) {
       userFilter.OR = [
@@ -92,7 +94,8 @@ export function buildSubmissionWhere(filters: ReturnType<typeof parseFilterQuery
         { name: { contains: filters.user, mode: 'insensitive' } },
       ];
     }
-    if (filters.region) userFilter.region = { contains: filters.region };
+    if (filters.state) userFilter.state = { contains: filters.state, mode: 'insensitive' };
+    if (filters.district) userFilter.district = { contains: filters.district, mode: 'insensitive' };
     where.user = userFilter;
   }
 
@@ -105,7 +108,8 @@ export function buildSubmissionWhere(filters: ReturnType<typeof parseFilterQuery
       { mobileNumber: { contains: filters.search } },
       { user: { mobileNumber: { contains: filters.search } } },
       { user: { name: { contains: filters.search, mode: 'insensitive' } } },
-      { user: { region: { contains: filters.search } } },
+      { user: { state: { contains: filters.search, mode: 'insensitive' } } },
+      { user: { district: { contains: filters.search, mode: 'insensitive' } } },
     ];
   }
 
@@ -122,7 +126,7 @@ export async function fetchFilteredSubmissions(prisma: any, filters: ReturnType<
       mobileNumber: true,
       submittedAt: true,
       userId: true,
-      user: { select: { name: true, mobileNumber: true, role: true, region: true } },
+      user: { select: { name: true, mobileNumber: true, role: true, region: true, state: true, district: true } },
     },
     orderBy: { submittedAt: 'desc' },
   }) as Promise<SubmissionRow[]>;

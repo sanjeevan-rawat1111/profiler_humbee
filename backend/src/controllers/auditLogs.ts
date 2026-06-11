@@ -8,7 +8,8 @@ type AuditEventRow = {
   id: string;
   username: string;
   name: string | null;
-  region: string | null;
+  state: string | null;
+  district: string | null;
   eventType: string;
   status: string;
   reason: string | null;
@@ -36,7 +37,8 @@ function buildAuditWhere(query: Record<string, unknown>) {
       OR: [
         { name: { contains: search, mode: 'insensitive' } },
         { username: { contains: search } },
-        { region: { contains: search, mode: 'insensitive' } },
+        { state: { contains: search, mode: 'insensitive' } },
+        { district: { contains: search, mode: 'insensitive' } },
         { eventType: { contains: search, mode: 'insensitive' } },
       ],
     });
@@ -48,8 +50,8 @@ function buildAuditWhere(query: Record<string, unknown>) {
     if (identityClauses.length > 1) andClauses.push({ AND: identityClauses });
   }
 
-  if (state) andClauses.push({ region: { contains: state, mode: 'insensitive' } });
-  if (district) andClauses.push({ region: { contains: district, mode: 'insensitive' } });
+  if (state) andClauses.push({ state: { contains: state, mode: 'insensitive' } });
+  if (district) andClauses.push({ district: { contains: district, mode: 'insensitive' } });
   if (eventType) andClauses.push({ eventType });
 
   const range = periodToDateRange(query);
@@ -76,14 +78,15 @@ function aggregateSummary(events: AuditEventRow[]) {
       byMobile.set(event.username, {
         name: event.name ?? '',
         userMobile: event.username,
-        state: event.region ?? '',
-        district: '',
+        state: event.state ?? '',
+        district: event.district ?? '',
         events: [],
       });
     }
     const entry = byMobile.get(event.username)!;
     if (event.name) entry.name = event.name;
-    if (event.region) entry.state = event.region;
+    if (event.state) entry.state = event.state;
+    if (event.district) entry.district = event.district;
     entry.events.push(event);
   });
 
@@ -128,7 +131,8 @@ async function fetchAuditEvents(query: Record<string, unknown>) {
       id: true,
       username: true,
       name: true,
-      region: true,
+      state: true,
+      district: true,
       eventType: true,
       status: true,
       reason: true,
@@ -180,8 +184,8 @@ export async function getAuditLogDetails(req: Request, res: Response) {
       data: {
         name: profile?.name ?? '',
         userMobile,
-        state: profile?.region ?? '',
-        district: '',
+        state: profile?.state ?? '',
+        district: profile?.district ?? '',
         activities: userEvents.map((event) => ({
           id: event.id,
           eventType: event.eventType,

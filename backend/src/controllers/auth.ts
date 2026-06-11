@@ -26,6 +26,8 @@ export async function login(req: Request, res: Response) {
         userId: user.id,
         username: mobileNumber,
         name: user.name,
+        state: user.state,
+        district: user.district,
         region: user.region,
         eventType: 'LOGIN',
         status: 'FAIL',
@@ -40,6 +42,8 @@ export async function login(req: Request, res: Response) {
         userId: user.id,
         username: mobileNumber,
         name: user.name,
+        state: user.state,
+        district: user.district,
         region: user.region,
         eventType: 'LOGIN',
         status: 'FAIL',
@@ -54,6 +58,8 @@ export async function login(req: Request, res: Response) {
       userId: user.id,
       username: user.mobileNumber,
       name: user.name,
+      state: user.state,
+      district: user.district,
       region: user.region,
       eventType: 'LOGIN',
       status: 'SUCCESS',
@@ -85,12 +91,14 @@ export async function logout(req: AuthenticatedRequest, res: Response) {
     if (req.user) {
       const user = await prisma.user.findUnique({
         where: { id: req.user.userId },
-        select: { name: true, region: true },
+        select: { name: true, state: true, district: true, region: true },
       });
       await recordAuditLog({
         userId: req.user.userId,
         username: req.user.mobileNumber,
         name: user?.name ?? null,
+        state: user?.state ?? null,
+        district: user?.district ?? null,
         region: user?.region ?? null,
         eventType: 'LOGOUT',
         status: 'SUCCESS',

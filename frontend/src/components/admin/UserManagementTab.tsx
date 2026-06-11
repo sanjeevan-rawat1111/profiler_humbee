@@ -42,7 +42,8 @@ const UserManagementTab: React.FC<Props> = ({
     name: '',
     mobileNumber: '',
     password: '',
-    region: '',
+    state: '',
+    district: '',
     role: 'user' as 'user' | 'admin',
     status: 'active' as 'active' | 'inactive',
   });
@@ -72,7 +73,7 @@ const UserManagementTab: React.FC<Props> = ({
 
   const openCreate = () => {
     setEditingUser(null);
-    setForm({ name: '', mobileNumber: '', password: '', region: '', role: 'user', status: 'active' });
+    setForm({ name: '', mobileNumber: '', password: '', state: '', district: '', role: 'user', status: 'active' });
     setFieldErrors({});
     setShowForm(true);
   };
@@ -83,7 +84,8 @@ const UserManagementTab: React.FC<Props> = ({
       name: user.name,
       mobileNumber: user.mobileNumber,
       password: '',
-      region: user.region,
+      state: user.state,
+      district: user.district,
       role: user.role as 'user' | 'admin',
       status: user.status as 'active' | 'inactive',
     });
@@ -144,7 +146,8 @@ const UserManagementTab: React.FC<Props> = ({
         const payload: Record<string, string> = {
           name: form.name,
           mobileNumber: form.mobileNumber,
-          region: form.region,
+          state: form.state,
+          district: form.district,
           role: form.role,
           status: form.status,
         };
@@ -188,7 +191,7 @@ const UserManagementTab: React.FC<Props> = ({
     }
   };
 
-  const hasActiveFilters = filters.region || filters.mobileNumbers.length > 0 || filters.role || filters.statuses.length > 0;
+  const hasActiveFilters = filters.state || filters.district || filters.mobileNumbers.length > 0 || filters.role || filters.statuses.length > 0;
 
   return (
     <div className="space-y-6">
@@ -249,15 +252,27 @@ const UserManagementTab: React.FC<Props> = ({
               ))}
             </select>
           </div>
-          <div className="min-w-[220px] flex-1">
+          <div className="min-w-[180px] flex-1">
             <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-              Region
+              State
             </label>
             <input
               type="text"
-              placeholder="Filter by region"
-              value={filters.region}
-              onChange={(e) => updateFilters({ region: e.target.value })}
+              placeholder="Filter by state"
+              value={filters.state}
+              onChange={(e) => updateFilters({ state: e.target.value })}
+              className="input-style-compact w-full min-h-[42px] rounded-xl"
+            />
+          </div>
+          <div className="min-w-[180px] flex-1">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              District
+            </label>
+            <input
+              type="text"
+              placeholder="Filter by district"
+              value={filters.district}
+              onChange={(e) => updateFilters({ district: e.target.value })}
               className="input-style-compact w-full min-h-[42px] rounded-xl"
             />
           </div>
@@ -323,9 +338,17 @@ const UserManagementTab: React.FC<Props> = ({
           />
           <input
             type="text"
-            placeholder="Region"
-            value={form.region}
-            onChange={(e) => setForm({ ...form, region: e.target.value })}
+            placeholder="State"
+            value={form.state}
+            onChange={(e) => setForm({ ...form, state: e.target.value })}
+            className="input-style-compact w-full"
+            required
+          />
+          <input
+            type="text"
+            placeholder="District"
+            value={form.district}
+            onChange={(e) => setForm({ ...form, district: e.target.value })}
             className="input-style-compact w-full"
             required
           />
@@ -359,7 +382,8 @@ const UserManagementTab: React.FC<Props> = ({
                 <th className="p-4 text-left">Name</th>
                 <th className="p-4 text-left">User Mobile</th>
                 <th className="p-4 text-left">Password</th>
-                <th className="p-4 text-left">Region</th>
+                <th className="p-4 text-left">State</th>
+                <th className="p-4 text-left">District</th>
                 <th className="p-4 text-left">Role</th>
                 <th className="p-4 text-left">Created At</th>
                 <th className="p-4 text-left">Status</th>
@@ -386,7 +410,8 @@ const UserManagementTab: React.FC<Props> = ({
                       </button>
                     </div>
                   </td>
-                  <td className="p-4 text-slate-600">{u.region}</td>
+                  <td className="p-4 text-slate-600">{u.state}</td>
+                  <td className="p-4 text-slate-600">{u.district}</td>
                   <td className="p-4">
                     <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${u.role === 'admin' ? 'bg-amber-50 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>{u.role}</span>
                   </td>

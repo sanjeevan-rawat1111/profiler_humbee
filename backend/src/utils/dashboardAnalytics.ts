@@ -46,12 +46,18 @@ export function rowsInRange(rows: SubmissionRow[], range: { gte: Date; lte: Date
 }
 
 export function uniqueByUser(rows: SubmissionRow[]) {
-  const map = new Map<string, { name: string; region: string; keys: Set<string>; lastAt: Date }>();
+  const map = new Map<string, { name: string; state: string; district: string; keys: Set<string>; lastAt: Date }>();
   rows.forEach((row) => {
     if (!row.user) return;
     const mobileNumber = row.user.mobileNumber;
     if (!map.has(mobileNumber)) {
-      map.set(mobileNumber, { name: row.user.name, region: row.user.region, keys: new Set(), lastAt: row.submittedAt });
+      map.set(mobileNumber, {
+        name: row.user.name,
+        state: row.user.state,
+        district: row.user.district,
+        keys: new Set(),
+        lastAt: row.submittedAt,
+      });
     }
     const entry = map.get(mobileNumber)!;
     entry.keys.add(uniqueSubmissionKey(row));
@@ -60,18 +66,18 @@ export function uniqueByUser(rows: SubmissionRow[]) {
   return map;
 }
 
-export function uniqueByRegion(rows: SubmissionRow[]) {
+export function uniqueByState(rows: SubmissionRow[]) {
   const map = new Map<string, Set<string>>();
-  const usersByRegion = new Map<string, Set<string>>();
+  const usersByState = new Map<string, Set<string>>();
   rows.forEach((row) => {
     if (!row.user) return;
-    const region = row.user.region || 'Unknown';
-    if (!map.has(region)) map.set(region, new Set());
-    map.get(region)?.add(uniqueSubmissionKey(row));
-    if (!usersByRegion.has(region)) usersByRegion.set(region, new Set());
-    usersByRegion.get(region)?.add(row.user.mobileNumber);
+    const state = row.user.state || 'Unknown';
+    if (!map.has(state)) map.set(state, new Set());
+    map.get(state)?.add(uniqueSubmissionKey(row));
+    if (!usersByState.has(state)) usersByState.set(state, new Set());
+    usersByState.get(state)?.add(row.user.mobileNumber);
   });
-  return { submissions: map, users: usersByRegion };
+  return { submissions: map, users: usersByState };
 }
 
 export function topEntry<T extends string>(map: Map<T, Set<string>>): { name: T; count: number } | null {
@@ -82,32 +88,32 @@ export function topEntry<T extends string>(map: Map<T, Set<string>>): { name: T;
   return best;
 }
 
-export function trendByRegion(rows: SubmissionRow[], range: { gte: Date; lte: Date }) {
-  const byDayRegion = new Map<string, Map<string, Set<string>>>();
+export function trendByState(rows: SubmissionRow[], range: { gte: Date; lte: Date }) {
+  const byDayState = new Map<string, Map<string, Set<string>>>();
   rowsInRange(rows, range).forEach((row) => {
     if (!row.user) return;
     const day = toDateKey(row.submittedAt);
-    const region = row.user.region || 'Unknown';
-    if (!byDayRegion.has(day)) byDayRegion.set(day, new Map());
-    const dayMap = byDayRegion.get(day)!;
-    if (!dayMap.has(region)) dayMap.set(region, new Set());
-    dayMap.get(region)?.add(uniqueSubmissionKey(row));
+    const state = row.user.state || 'Unknown';
+    if (!byDayState.has(day)) byDayState.set(day, new Map());
+    const dayMap = byDayState.get(day)!;
+    if (!dayMap.has(state)) dayMap.set(state, new Set());
+    dayMap.get(state)?.add(uniqueSubmissionKey(row));
   });
 
   const cursor = new Date(range.gte);
   while (cursor <= range.lte) {
     const day = toDateKey(cursor);
-    if (!byDayRegion.has(day)) byDayRegion.set(day, new Map());
+    if (!byDayState.has(day)) byDayState.set(day, new Map());
     cursor.setDate(cursor.getDate() + 1);
   }
 
-  const regions = [...new Set(rows.map((r) => r.user?.region || 'Unknown'))];
-  return Array.from(byDayRegion.entries())
+  const states = [...new Set(rows.map((r) => r.user?.state || 'Unknown'))];
+  return Array.from(byDayState.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, regionMap]) => {
+    .map(([date, stateMap]) => {
       const point: Record<string, string | number> = { date };
-      regions.forEach((region) => {
-        point[region] = regionMap.get(region)?.size ?? 0;
+      states.forEach((state) => {
+        point[state] = stateMap.get(state)?.size ?? 0;
       });
       return point;
     });
@@ -117,8 +123,8 @@ export function prepareAnalyticsRows(rows: SubmissionRow[]) {
   return filterAnalyticsRows(rows);
 }
 
-export function countActiveRegionsToday(todayRows: SubmissionRow[]) {
-  return new Set(todayRows.map((r) => r.user?.region).filter(Boolean)).size;
+export function countActiveStatesToday(todayRows: SubmissionRow[]) {
+  return new Set(todayRows.map((r) => r.user?.state).filter(Boolean)).size;
 }
 
 export function resolveDashboardRange(
@@ -146,12 +152,14 @@ export function parseArrayParam(value: unknown): string[] {
 
 export function filterRowsBySelections(
   rows: SubmissionRow[],
-  regions: string[],
+  states: string[],
+  districts: string[],
   users: string[],
 ) {
   return rows.filter((row) => {
     if (!row.user) return false;
-    if (regions.length && !regions.includes(row.user.region)) return false;
+    if (states.length && !states.includes(row.user.state)) return false;
+    if (districts.length && !districts.includes(row.user.district)) return false;
     if (users.length && !users.includes(row.user.mobileNumber)) return false;
     return true;
   });
@@ -201,15 +209,15 @@ export function countActiveUsers(rows: SubmissionRow[]) {
   return new Set(rows.map((r) => r.user?.mobileNumber).filter(Boolean)).size;
 }
 
-export function countActiveRegions(rows: SubmissionRow[]) {
-  return new Set(rows.map((r) => r.user?.region).filter(Boolean)).size;
+export function countActiveStates(rows: SubmissionRow[]) {
+  return new Set(rows.map((r) => r.user?.state).filter(Boolean)).size;
 }
 
-export function leaderboardFromRows(rows: SubmissionRow[], mode: 'region' | 'user') {
-  if (mode === 'region') {
-    const { submissions } = uniqueByRegion(rows);
+export function leaderboardFromRows(rows: SubmissionRow[], mode: 'state' | 'user') {
+  if (mode === 'state') {
+    const { submissions } = uniqueByState(rows);
     return Array.from(submissions.entries())
-      .map(([region, keys]) => ({ name: region, totalSubmissions: keys.size }))
+      .map(([state, keys]) => ({ name: state, totalSubmissions: keys.size }))
       .sort((a, b) => b.totalSubmissions - a.totalSubmissions)
       .map((item, index) => ({ rank: index + 1, ...item }));
   }

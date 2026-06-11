@@ -201,6 +201,8 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
               <th className="p-4 text-left">Timestamp</th>
               <th className="p-4 text-left">Name</th>
               <th className="p-4 text-left">User Mobile</th>
+              <th className="p-4 text-left">State</th>
+              <th className="p-4 text-left">District</th>
               <th className="p-4 text-left">SAP Code</th>
               <th className="p-4 text-left">VCP Mobile</th>
             </tr>
@@ -211,6 +213,8 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
                 <td className="p-4">{formatDateTime(row.timestamp)}</td>
                 <td className="p-4 font-semibold text-slate-800">{row.userName}</td>
                 <td className="p-4 font-mono text-slate-700">{row.userMobileNumber}</td>
+                <td className="p-4 text-slate-600">{row.state}</td>
+                <td className="p-4 text-slate-600">{row.district}</td>
                 <td className="p-4 font-mono text-humbee-600">{row.sapCode}</td>
                 <td className="p-4 font-mono">{row.customerMobileNumber}</td>
               </tr>

@@ -23,7 +23,8 @@ export function buildFilterParams(filters: SubmissionFilters, extra: Record<stri
   };
   if (filters.search) params.search = filters.search;
   if (filters.user) params.user = filters.user;
-  if (filters.region) params.region = filters.region;
+  if (filters.state) params.state = filters.state;
+  if (filters.district) params.district = filters.district;
   if (filters.sapCode) params.sapCode = filters.sapCode;
   if (filters.mobileNumber) params.mobileNumber = filters.mobileNumber;
   return params;
@@ -60,12 +61,17 @@ export async function downloadExport(url: string, filename: string, params: Reco
 }
 
 export function buildDashboardParams(filters: GlobalDashboardFilters) {
-  return buildPeriodParams(filters.period, filters.fromDate, filters.toDate);
+  const params: Record<string, string> = buildPeriodParams(filters.period, filters.fromDate, filters.toDate);
+  if (filters.states.length) params.states = filters.states.join(',');
+  if (filters.districts.length) params.districts = filters.districts.join(',');
+  if (filters.users.length) params.users = filters.users.join(',');
+  return params;
 }
 
 export function buildUserMgmtParams(filters: UserManagementFilters) {
   const params: Record<string, string> = {};
-  if (filters.region) params.region = filters.region;
+  if (filters.state) params.state = filters.state;
+  if (filters.district) params.district = filters.district;
   if (filters.role) params.role = filters.role;
   if (filters.mobileNumbers.length) params.mobileNumbers = filters.mobileNumbers.join(',');
   if (filters.statuses.length) params.status = filters.statuses.join(',');

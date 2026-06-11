@@ -21,7 +21,8 @@ export const createUserSchema = z.object({
   password: z.string()
     .regex(/^(?=.*[A-Z])(?=.*\d).{6,}$/, 'Password must be at least 6 characters, contain 1 uppercase letter and 1 number'),
   role: z.enum(['user', 'admin']).optional().default('user'),
-  region: z.string().trim().min(1, 'Region is required'),
+  state: z.string().trim().min(1, 'State is required'),
+  district: z.string().trim().min(1, 'District is required'),
   status: z.enum(['active', 'inactive']).optional().default('active'),
 });
 
@@ -32,7 +33,8 @@ export const updateUserSchema = z.object({
     .regex(/^(?=.*[A-Z])(?=.*\d).{6,}$/, 'Password must be at least 6 characters, contain 1 uppercase letter and 1 number')
     .optional(),
   role: z.enum(['user', 'admin']).optional(),
-  region: z.string().trim().min(1).optional(),
+  state: z.string().trim().min(1).optional(),
+  district: z.string().trim().min(1).optional(),
   status: z.enum(['active', 'inactive']).optional(),
 });
 

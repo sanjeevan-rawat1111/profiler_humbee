@@ -8,7 +8,7 @@ import {
 } from '../utils/submissionFilters';
 import {
   contributionDistribution,
-  countActiveRegions,
+  countActiveStates,
   countActiveUsers,
   filterRowsBySelections,
   leaderboardFromRows,
@@ -16,7 +16,7 @@ import {
   prepareAnalyticsRows,
   resolveDashboardRange,
   rowsInRange,
-  uniqueByRegion,
+  uniqueByState,
   uniqueByUser,
 } from '../utils/dashboardAnalytics';
 
@@ -24,54 +24,71 @@ function parseUnifiedQuery(query: Record<string, unknown>) {
   const period = String(query.period || 'week');
   const fromDate = String(query.fromDate || '').trim();
   const toDate = String(query.toDate || '').trim();
-  const regions = parseArrayParam(query.regions ?? query.region);
+  const states = parseArrayParam(query.states ?? query.regions ?? query.state ?? query.region);
+  const districts = parseArrayParam(query.districts ?? query.district);
   const users = parseArrayParam(query.users ?? query.user);
-  return { period, fromDate, toDate, regions, users };
+  return { period, fromDate, toDate, states, districts, users };
 }
 
 async function loadAllAnalyticsRows() {
   return prepareAnalyticsRows(await fetchFilteredSubmissions(prisma, parseFilterQuery({})));
 }
 
-async function buildFilterOptions(allRows: ReturnType<typeof prepareAnalyticsRows>, regions: string[]) {
-  const regionSet = new Set<string>();
+async function buildFilterOptions(
+  allRows: ReturnType<typeof prepareAnalyticsRows>,
+  states: string[],
+  districts: string[],
+) {
+  const stateSet = new Set<string>();
+  const districtSet = new Set<string>();
   allRows.forEach((row) => {
-    if (row.user?.region) regionSet.add(row.user.region);
+    if (row.user?.state) stateSet.add(row.user.state);
+    if (row.user?.district) districtSet.add(row.user.district);
   });
 
   const userWhere: Record<string, unknown> = {
     role: 'user',
     mobileNumber: { notIn: excludedAnalyticsMobileNumbers() },
   };
-  if (regions.length) userWhere.region = { in: regions };
+  if (states.length) userWhere.state = { in: states };
+  if (districts.length) userWhere.district = { in: districts };
 
   const dbUsers = await prisma.user.findMany({
     where: userWhere,
-    select: { name: true, mobileNumber: true, region: true },
+    select: { name: true, mobileNumber: true, state: true, district: true },
     orderBy: { mobileNumber: 'asc' },
   });
 
   dbUsers.forEach((user) => {
-    if (user.region) regionSet.add(user.region);
+    if (user.state) stateSet.add(user.state);
+    if (user.district) districtSet.add(user.district);
   });
 
   return {
-    regions: [...regionSet].sort(),
-    users: dbUsers.map((user) => ({ name: user.name, mobileNumber: user.mobileNumber, region: user.region })),
+    states: [...stateSet].sort(),
+    districts: [...districtSet].sort(),
+    users: dbUsers.map((user) => ({
+      name: user.name,
+      mobileNumber: user.mobileNumber,
+      state: user.state,
+      district: user.district,
+    })),
   };
 }
 
 async function buildInactiveUsers(
   allRows: ReturnType<typeof prepareAnalyticsRows>,
   rangeRows: ReturnType<typeof prepareAnalyticsRows>,
-  regions: string[],
+  states: string[],
+  districts: string[],
   users: string[],
 ) {
   const userWhere: Record<string, unknown> = {
     role: 'user',
     mobileNumber: { notIn: excludedAnalyticsMobileNumbers() },
   };
-  if (regions.length) userWhere.region = { in: regions };
+  if (states.length) userWhere.state = { in: states };
+  if (districts.length) userWhere.district = { in: districts };
   if (users.length) {
     userWhere.mobileNumber = {
       in: users.filter((mobile) => !isExcludedAnalyticsMobile(mobile)),
@@ -80,14 +97,14 @@ async function buildInactiveUsers(
 
   const scopedUsers = await prisma.user.findMany({
     where: userWhere,
-    select: { name: true, mobileNumber: true, region: true },
+    select: { name: true, mobileNumber: true, state: true, district: true },
   });
 
   const activeMobileNumbers = new Set(
     rangeRows.map((row) => row.user?.mobileNumber).filter(Boolean) as string[],
   );
 
-  const lifetimeByUser = uniqueByUser(filterRowsBySelections(allRows, regions, users));
+  const lifetimeByUser = uniqueByUser(filterRowsBySelections(allRows, states, districts, users));
 
   const inactiveList = scopedUsers
     .filter((user) => !activeMobileNumbers.has(user.mobileNumber))
@@ -96,7 +113,8 @@ async function buildInactiveUsers(
       return {
         name: user.name,
         mobileNumber: user.mobileNumber,
-        region: user.region,
+        state: user.state,
+        district: user.district,
         lastSubmission: lifetime?.lastAt?.toISOString() ?? null,
       };
     })
@@ -114,26 +132,26 @@ async function buildInactiveUsers(
 }
 
 export async function getUnifiedDashboard(req: Request, res: Response) {
-  const { period, fromDate, toDate, regions, users } = parseUnifiedQuery(req.query);
+  const { period, fromDate, toDate, states, districts, users } = parseUnifiedQuery(req.query);
   try {
     const allRows = await loadAllAnalyticsRows();
-    const filteredRows = filterRowsBySelections(allRows, regions, users);
+    const filteredRows = filterRowsBySelections(allRows, states, districts, users);
     const range = resolveDashboardRange(period, fromDate, toDate);
     const rangeRows = rowsInRange(filteredRows, range);
-    const filterOptions = await buildFilterOptions(allRows, regions);
-    const inactiveUsers = await buildInactiveUsers(allRows, rangeRows, regions, users);
+    const filterOptions = await buildFilterOptions(allRows, states, districts);
+    const inactiveUsers = await buildInactiveUsers(allRows, rangeRows, states, districts, users);
 
-    const byRegion = uniqueByRegion(rangeRows);
+    const byState = uniqueByState(rangeRows);
     const byUser = uniqueByUser(rangeRows);
 
-    const regionTotalChart = Array.from(byRegion.submissions.entries())
-      .map(([region, keys]) => ({ region, uniqueCount: keys.size }))
+    const stateTotalChart = Array.from(byState.submissions.entries())
+      .map(([state, keys]) => ({ state, uniqueCount: keys.size }))
       .sort((a, b) => b.uniqueCount - a.uniqueCount);
 
-    const regionContribution = contributionDistribution(
-      regionTotalChart.map((item) => ({ name: item.region, uniqueCount: item.uniqueCount })),
+    const stateContribution = contributionDistribution(
+      stateTotalChart.map((item) => ({ name: item.state, uniqueCount: item.uniqueCount })),
     ).map((item) => ({
-      region: item.name,
+      state: item.name,
       uniqueCount: item.uniqueCount,
       percentage: Math.round(item.percentage),
     }));
@@ -150,9 +168,9 @@ export async function getUnifiedDashboard(req: Request, res: Response) {
       percentage: userChartTotal ? Math.round((item.uniqueCount / userChartTotal) * 100) : 0,
     }));
 
-    const regionLeaderboard = leaderboardFromRows(rangeRows, 'region').map((item) => ({
+    const stateLeaderboard = leaderboardFromRows(rangeRows, 'state').map((item) => ({
       rank: item.rank,
-      region: item.name,
+      state: item.name,
       totalSubmissions: item.totalSubmissions,
     }));
 
@@ -170,25 +188,25 @@ export async function getUnifiedDashboard(req: Request, res: Response) {
       success: true,
       data: {
         lastUpdated: new Date().toISOString(),
-        filters: { period, fromDate, toDate, regions, users },
+        filters: { period, fromDate, toDate, states, districts, users },
         filterOptions,
         summary: {
           totalSubmissions: countUniqueSubmissions(rangeRows),
           activeUsers: countActiveUsers(rangeRows),
-          activeRegions: countActiveRegions(rangeRows),
+          activeStates: countActiveStates(rangeRows),
           inactiveUsers: inactiveUsers.count,
         },
         inactiveUsers: inactiveUsers.list,
-        regions: {
-          totalChart: regionTotalChart,
-          contribution: regionContribution,
+        states: {
+          totalChart: stateTotalChart,
+          contribution: stateContribution,
         },
         users: {
           topChart: userTopChart,
           activityDistribution: userActivityDistribution,
         },
         topPerformers: {
-          regions: regionLeaderboard,
+          states: stateLeaderboard,
           users: userLeaderboard,
         },
       },

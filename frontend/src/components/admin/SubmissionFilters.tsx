@@ -44,14 +44,14 @@ const SubmissionFiltersBar: React.FC<Props> = ({
         <Search className="input-wrapper-icon w-4 h-4 text-slate-400" />
         <input
           type="text"
-          placeholder="Search by name, user mobile, VCP mobile, region, SAP code..."
+          placeholder="Search by name, user mobile, VCP mobile, state, district, SAP code..."
           value={filters.search}
           onChange={(e) => update('search', e.target.value)}
           className="input-style-compact"
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         <select
           value={filters.user}
           onChange={(e) => update('user', e.target.value)}
@@ -66,9 +66,16 @@ const SubmissionFiltersBar: React.FC<Props> = ({
         </select>
         <input
           type="text"
-          placeholder="Region"
-          value={filters.region}
-          onChange={(e) => update('region', e.target.value)}
+          placeholder="State"
+          value={filters.state}
+          onChange={(e) => update('state', e.target.value)}
+          className="input-style-compact"
+        />
+        <input
+          type="text"
+          placeholder="District"
+          value={filters.district}
+          onChange={(e) => update('district', e.target.value)}
           className="input-style-compact"
         />
         <input

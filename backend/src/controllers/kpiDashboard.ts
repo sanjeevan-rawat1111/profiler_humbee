@@ -126,7 +126,8 @@ export async function getKpiDashboard(req: Request, res: Response) {
       timestamp: row.submittedAt.toISOString(),
       userName: row.user?.name ?? 'System',
       userMobileNumber: row.user?.mobileNumber ?? '',
-      region: row.user?.region ?? '',
+      state: row.user?.state ?? '',
+      district: row.user?.district ?? '',
       sapCode: row.sapCode,
       customerMobileNumber: row.mobileNumber,
     }));
@@ -136,7 +137,7 @@ export async function getKpiDashboard(req: Request, res: Response) {
         role: 'user',
         mobileNumber: { notIn: excludedAnalyticsMobileNumbers() },
       },
-      select: { name: true, mobileNumber: true, region: true },
+      select: { name: true, mobileNumber: true, state: true, district: true },
       orderBy: { mobileNumber: 'asc' },
     });
 
@@ -159,7 +160,8 @@ export async function getKpiDashboard(req: Request, res: Response) {
         topPerformingUsers,
         recentActivity,
         users: allUsers.map((u) => u.mobileNumber),
-        regions: [...new Set(allUsers.map((u) => u.region))].sort(),
+        states: [...new Set(allUsers.map((u) => u.state))].sort(),
+        districts: [...new Set(allUsers.map((u) => u.district))].sort(),
       },
     });
   } catch (error) {

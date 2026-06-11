@@ -3,7 +3,8 @@ export type DirectoryDownloadMode = 'normal' | 'master';
 export interface SubmissionFilters {
   search: string;
   user: string;
-  region: string;
+  state: string;
+  district: string;
   sapCode: string;
   mobileNumber: string;
   fromDate: string;
@@ -15,7 +16,8 @@ export interface DirectoryRecord {
   userId: string;
   userName: string;
   userMobileNumber: string;
-  region: string;
+  state: string;
+  district: string;
   sapCode: string;
   mobileNumber: string;
   submissionCount: number;
@@ -56,11 +58,14 @@ export interface KpiDashboardData {
     timestamp: string;
     userName: string;
     userMobileNumber: string;
+    state: string;
+    district: string;
     sapCode: string;
     customerMobileNumber: string;
   }[];
   users: string[];
-  regions: string[];
+  states: string[];
+  districts: string[];
 }
 
 export interface AuditSummaryRecord {
@@ -118,6 +123,8 @@ export interface DBUser {
   mobileNumber: string;
   role: string;
   region: string;
+  state: string;
+  district: string;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -131,35 +138,38 @@ export interface UnifiedDashboardData {
     period: DashboardPeriod;
     fromDate: string;
     toDate: string;
-    regions: string[];
+    states: string[];
+    districts: string[];
     users: string[];
   };
   filterOptions: {
-    regions: string[];
-    users: { name: string; mobileNumber: string; region: string }[];
+    states: string[];
+    districts: string[];
+    users: { name: string; mobileNumber: string; state: string; district: string }[];
   };
   summary: {
     totalSubmissions: number;
     activeUsers: number;
-    activeRegions: number;
+    activeStates: number;
     inactiveUsers: number;
   };
   inactiveUsers: {
     name: string;
     mobileNumber: string;
-    region: string;
+    state: string;
+    district: string;
     lastSubmission: string | null;
   }[];
-  regions: {
-    totalChart: { region: string; uniqueCount: number }[];
-    contribution: { region: string; uniqueCount: number; percentage: number }[];
+  states: {
+    totalChart: { state: string; uniqueCount: number }[];
+    contribution: { state: string; uniqueCount: number; percentage: number }[];
   };
   users: {
     topChart: { name: string; mobileNumber: string; uniqueCount: number }[];
     activityDistribution: { name: string; mobileNumber: string; uniqueCount: number; percentage: number }[];
   };
   topPerformers: {
-    regions: { rank: number; region: string; totalSubmissions: number }[];
+    states: { rank: number; state: string; totalSubmissions: number }[];
     users: { rank: number; name: string; mobileNumber: string; totalSubmissions: number }[];
   };
 }
@@ -168,7 +178,8 @@ export interface GlobalDashboardFilters {
   period: DashboardPeriod;
   fromDate: string;
   toDate: string;
-  regions: string[];
+  states: string[];
+  districts: string[];
   users: string[];
 }
 
@@ -176,19 +187,22 @@ export const defaultGlobalDashboardFilters: GlobalDashboardFilters = {
   period: 'week',
   fromDate: '',
   toDate: '',
-  regions: [],
+  states: [],
+  districts: [],
   users: [],
 };
 
 export interface UserManagementFilters {
-  region: string;
+  state: string;
+  district: string;
   mobileNumbers: string[];
   role: string;
   statuses: string[];
 }
 
 export const defaultUserManagementFilters: UserManagementFilters = {
-  region: '',
+  state: '',
+  district: '',
   mobileNumbers: [],
   role: '',
   statuses: [],
@@ -197,7 +211,8 @@ export const defaultUserManagementFilters: UserManagementFilters = {
 export const defaultFilters: SubmissionFilters = {
   search: '',
   user: '',
-  region: '',
+  state: '',
+  district: '',
   sapCode: '',
   mobileNumber: '',
   fromDate: '',
