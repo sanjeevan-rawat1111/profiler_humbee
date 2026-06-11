@@ -152,14 +152,14 @@ export function parseArrayParam(value: unknown): string[] {
 
 export function filterRowsBySelections(
   rows: SubmissionRow[],
-  states: string[],
-  districts: string[],
+  stateId: string,
+  districtId: string,
   users: string[],
 ) {
   return rows.filter((row) => {
     if (!row.user) return false;
-    if (states.length && !states.includes(row.user.state)) return false;
-    if (districts.length && !districts.includes(row.user.district)) return false;
+    if (stateId && row.user.stateId !== stateId) return false;
+    if (districtId && row.user.districtId !== districtId) return false;
     if (users.length && !users.includes(row.user.mobileNumber)) return false;
     return true;
   });

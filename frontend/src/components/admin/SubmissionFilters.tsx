@@ -1,6 +1,7 @@
 import React from 'react';
 import { Search, FilterX, RefreshCw, FileSpreadsheet, FileDown } from 'lucide-react';
 import DatePeriodFilter from './DatePeriodFilter';
+import StateDistrictSelect from '../StateDistrictSelect';
 import type { DirectoryDownloadMode, SubmissionFilters as Filters } from '../../types/admin';
 
 interface Props {
@@ -51,7 +52,7 @@ const SubmissionFiltersBar: React.FC<Props> = ({
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <select
           value={filters.user}
           onChange={(e) => update('user', e.target.value)}
@@ -64,20 +65,6 @@ const SubmissionFiltersBar: React.FC<Props> = ({
             <option key={officer.mobileNumber} value={officer.mobileNumber}>{officer.name}</option>
           ))}
         </select>
-        <input
-          type="text"
-          placeholder="State"
-          value={filters.state}
-          onChange={(e) => update('state', e.target.value)}
-          className="input-style-compact"
-        />
-        <input
-          type="text"
-          placeholder="District"
-          value={filters.district}
-          onChange={(e) => update('district', e.target.value)}
-          className="input-style-compact"
-        />
         <input
           type="text"
           placeholder="SAP Code"
@@ -93,6 +80,14 @@ const SubmissionFiltersBar: React.FC<Props> = ({
           className="input-style-compact"
         />
       </div>
+
+      <StateDistrictSelect
+        stateId={filters.stateId}
+        districtId={filters.districtId}
+        onChange={(stateId, districtId) => setFilters((prev) => ({ ...prev, stateId, districtId }))}
+        stateLabel=""
+        districtLabel=""
+      />
 
       <div className="flex flex-wrap justify-between gap-2 pt-1">
         <button

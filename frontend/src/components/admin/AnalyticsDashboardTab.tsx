@@ -3,6 +3,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recha
 import { RefreshCw, TrendingUp, Users, MapPin, UserX } from 'lucide-react';
 import api from '../../services/api';
 import SearchableMultiSelect from './SearchableMultiSelect';
+import StateDistrictSelect from '../StateDistrictSelect';
 import RankedListPanel from './RankedListPanel';
 import ScrollableBarChart from './ScrollableBarChart';
 import type { GlobalDashboardFilters, UnifiedDashboardData, DashboardPeriod } from '../../types/admin';
@@ -73,12 +74,12 @@ const AnalyticsDashboardTab: React.FC = () => {
     const { users } = data.filterOptions;
     return users
       .filter((u) => {
-        if (filters.states.length && !filters.states.includes(u.state)) return false;
-        if (filters.districts.length && !filters.districts.includes(u.district)) return false;
+        if (filters.stateId && u.stateId !== filters.stateId) return false;
+        if (filters.districtId && u.districtId !== filters.districtId) return false;
         return true;
       })
       .map((u) => u.mobileNumber);
-  }, [data, filters.states, filters.districts]);
+  }, [data, filters.stateId, filters.districtId]);
 
   useEffect(() => {
     if (!filters.users.length) return;
@@ -119,7 +120,7 @@ const AnalyticsDashboardTab: React.FC = () => {
     [data],
   );
 
-  const hasScopeFilters = filters.states.length > 0 || filters.districts.length > 0 || filters.users.length > 0;
+  const hasScopeFilters = filters.stateId || filters.districtId || filters.users.length > 0;
 
   return (
     <div className="space-y-8 pb-12">
@@ -182,42 +183,30 @@ const AnalyticsDashboardTab: React.FC = () => {
             </div>
           )}
 
-          <div className="flex flex-col lg:flex-row gap-4">
-            <SearchableMultiSelect
-              label="States"
-              placeholder="Type state name..."
-              options={data?.filterOptions.states ?? []}
-              selected={filters.states}
-              onChange={(states) => setFilters((f) => ({ ...f, states }))}
-              disabled={!data && loading}
-            />
-            <SearchableMultiSelect
-              label="Districts"
-              placeholder="Type district name..."
-              options={data?.filterOptions.districts ?? []}
-              selected={filters.districts}
-              onChange={(districts) => setFilters((f) => ({ ...f, districts }))}
-              disabled={!data && loading}
-            />
-            <SearchableMultiSelect
-              label="Mobile Number"
-              placeholder="Search mobile number..."
-              options={availableUsers}
-              selected={filters.users}
-              onChange={(users) => setFilters((f) => ({ ...f, users }))}
-              disabled={!data && loading}
-            />
-          </div>
+          <StateDistrictSelect
+            stateId={filters.stateId}
+            districtId={filters.districtId}
+            onChange={(stateId, districtId) => setFilters((f) => ({ ...f, stateId, districtId }))}
+          />
+
+          <SearchableMultiSelect
+            label="Mobile Number"
+            placeholder="Search mobile number..."
+            options={availableUsers}
+            selected={filters.users}
+            onChange={(users) => setFilters((f) => ({ ...f, users }))}
+            disabled={!data && loading}
+          />
 
           {hasScopeFilters && (
             <div className="flex items-center gap-2 text-[11px] text-slate-500">
               <span className="font-semibold">Active filters:</span>
-              {filters.states.length > 0 && <span>{filters.states.length} state(s)</span>}
-              {filters.districts.length > 0 && <span>{filters.districts.length} district(s)</span>}
+              {filters.stateId && <span>State selected</span>}
+              {filters.districtId && <span>District selected</span>}
               {filters.users.length > 0 && <span>{filters.users.length} user(s)</span>}
               <button
                 type="button"
-                onClick={() => setFilters((f) => ({ ...f, states: [], districts: [], users: [] }))}
+                onClick={() => setFilters((f) => ({ ...f, stateId: '', districtId: '', users: [] }))}
                 className="text-humbee-700 font-semibold hover:underline cursor-pointer"
               >
                 Reset filters

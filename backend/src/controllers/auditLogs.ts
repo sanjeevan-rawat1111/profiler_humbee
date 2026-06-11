@@ -20,12 +20,12 @@ function formatStatus(status: string) {
   return status === 'SUCCESS' ? 'Success' : 'Failed';
 }
 
-function buildAuditWhere(query: Record<string, unknown>) {
+async function buildAuditWhere(query: Record<string, unknown>) {
   const user = String(query.user || '').trim();
   const name = String(query.name || '').trim();
   const search = String(query.search || '').trim();
-  const state = String(query.state || query.region || '').trim();
-  const district = String(query.district || '').trim();
+  const stateId = String(query.stateId || '').trim();
+  const districtId = String(query.districtId || '').trim();
   const eventType = String(query.eventType || '').trim();
 
   const andClauses: Record<string, unknown>[] = [
@@ -50,8 +50,18 @@ function buildAuditWhere(query: Record<string, unknown>) {
     if (identityClauses.length > 1) andClauses.push({ AND: identityClauses });
   }
 
-  if (state) andClauses.push({ state: { contains: state, mode: 'insensitive' } });
-  if (district) andClauses.push({ district: { contains: district, mode: 'insensitive' } });
+  if (stateId) {
+    const state = await prisma.state.findUnique({ where: { id: stateId } });
+    if (state) andClauses.push({ state: state.stateName });
+  }
+  if (districtId) {
+    const district = await prisma.district.findUnique({ where: { id: districtId } });
+    if (district) {
+      if (!stateId || district.stateId === stateId) {
+        andClauses.push({ district: district.districtName });
+      }
+    }
+  }
   if (eventType) andClauses.push({ eventType });
 
   const range = periodToDateRange(query);
@@ -123,7 +133,7 @@ function aggregateSummary(events: AuditEventRow[]) {
 }
 
 async function fetchAuditEvents(query: Record<string, unknown>) {
-  const where = buildAuditWhere(query);
+  const where = await buildAuditWhere(query);
   return prisma.auditLog.findMany({
     where,
     orderBy: { createdAt: 'asc' },

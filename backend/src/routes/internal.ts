@@ -21,6 +21,7 @@ import {
 import {
   getAuditLogs, getAuditLogDetails, exportAuditLogsCsv, exportAuditLogsExcel,
 } from '../controllers/auditLogs';
+import { getStates, getDistrictsByState } from '../controllers/geo';
 import { adminMiddleware } from '../middleware/admin';
 import { validateBody } from '../middleware/validate';
 import { createUserSchema, updateUserSchema } from '../validators/schemas';
@@ -34,6 +35,10 @@ const resetPasswordSchema = z.object({
 });
 
 router.use(adminMiddleware);
+
+// Geo master
+router.get('/geo/states', getStates);
+router.get('/geo/states/:stateId/districts', getDistrictsByState);
 
 // Users
 router.get('/users', getUsers);

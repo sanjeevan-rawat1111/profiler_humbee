@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FilterX, FileDown, FileSpreadsheet, X } from 'lucide-react';
 import api from '../../services/api';
 import DatePeriodFilter from './DatePeriodFilter';
+import StateDistrictSelect from '../StateDistrictSelect';
 import type { AuditActivityDetail, AuditFilters, AuditSummaryRecord } from '../../types/admin';
 import { defaultAuditFilters } from '../../types/admin';
 import { buildAuditParams, formatDateTime } from '../../utils/adminApi';
@@ -74,7 +75,7 @@ const AuditLogsTab: React.FC<Props> = ({
           className="input-style-compact w-full"
         />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <input
             type="text"
             placeholder="Name"
@@ -89,26 +90,20 @@ const AuditLogsTab: React.FC<Props> = ({
             onChange={(e) => update('user', e.target.value)}
             className="input-style-compact"
           />
-          <input
-            type="text"
-            placeholder="State"
-            value={filters.state}
-            onChange={(e) => update('state', e.target.value)}
-            className="input-style-compact"
-          />
-          <input
-            type="text"
-            placeholder="District"
-            value={filters.district}
-            onChange={(e) => update('district', e.target.value)}
-            className="input-style-compact"
-          />
           <select value={filters.eventType} onChange={(e) => update('eventType', e.target.value)} className="input-style-compact">
             <option value="">All Event Types</option>
             <option value="LOGIN">LOGIN</option>
             <option value="LOGOUT">LOGOUT</option>
           </select>
         </div>
+
+        <StateDistrictSelect
+          stateId={filters.stateId}
+          districtId={filters.districtId}
+          onChange={(stateId, districtId) => setFilters((prev) => ({ ...prev, stateId, districtId }))}
+          stateLabel=""
+          districtLabel=""
+        />
 
         <div className="flex flex-wrap justify-between gap-2">
           <button

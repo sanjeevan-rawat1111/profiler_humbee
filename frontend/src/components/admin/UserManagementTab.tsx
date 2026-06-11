@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Pencil, Eye, EyeOff, FileDown, FileSpreadsheet } from 'lucide-react';
 import api from '../../services/api';
 import SearchableMultiSelect from './SearchableMultiSelect';
+import StateDistrictSelect from '../StateDistrictSelect';
 import type { DBUser, UserManagementFilters } from '../../types/admin';
 import { defaultUserManagementFilters } from '../../types/admin';
 import { formatDateTime } from '../../utils/adminApi';
@@ -42,12 +43,12 @@ const UserManagementTab: React.FC<Props> = ({
     name: '',
     mobileNumber: '',
     password: '',
-    state: '',
-    district: '',
+    stateId: '',
+    districtId: '',
     role: 'user' as 'user' | 'admin',
     status: 'active' as 'active' | 'inactive',
   });
-  const [fieldErrors, setFieldErrors] = useState<{ name?: string; mobileNumber?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; mobileNumber?: string; geo?: string }>({});
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [passwordCache, setPasswordCache] = useState<Record<string, string>>({});
 
@@ -73,7 +74,7 @@ const UserManagementTab: React.FC<Props> = ({
 
   const openCreate = () => {
     setEditingUser(null);
-    setForm({ name: '', mobileNumber: '', password: '', state: '', district: '', role: 'user', status: 'active' });
+    setForm({ name: '', mobileNumber: '', password: '', stateId: '', districtId: '', role: 'user', status: 'active' });
     setFieldErrors({});
     setShowForm(true);
   };
@@ -84,8 +85,8 @@ const UserManagementTab: React.FC<Props> = ({
       name: user.name,
       mobileNumber: user.mobileNumber,
       password: '',
-      state: user.state,
-      district: user.district,
+      stateId: user.stateId ?? '',
+      districtId: user.districtId ?? '',
       role: user.role as 'user' | 'admin',
       status: user.status as 'active' | 'inactive',
     });
@@ -94,7 +95,7 @@ const UserManagementTab: React.FC<Props> = ({
   };
 
   const validateForm = () => {
-    const errs: { name?: string; mobileNumber?: string } = {};
+    const errs: { name?: string; mobileNumber?: string; geo?: string } = {};
     if (!form.name.trim()) {
       errs.name = 'Name is required.';
     }
@@ -102,6 +103,9 @@ const UserManagementTab: React.FC<Props> = ({
       errs.mobileNumber = 'Mobile Number is required.';
     } else if (!MOBILE_REGEX.test(form.mobileNumber.trim())) {
       errs.mobileNumber = 'Please enter a valid 10-digit Mobile Number.';
+    }
+    if (!form.stateId || !form.districtId) {
+      errs.geo = 'State and District are required.';
     }
     return errs;
   };
@@ -146,8 +150,8 @@ const UserManagementTab: React.FC<Props> = ({
         const payload: Record<string, string> = {
           name: form.name,
           mobileNumber: form.mobileNumber,
-          state: form.state,
-          district: form.district,
+          stateId: form.stateId,
+          districtId: form.districtId,
           role: form.role,
           status: form.status,
         };
@@ -191,7 +195,7 @@ const UserManagementTab: React.FC<Props> = ({
     }
   };
 
-  const hasActiveFilters = filters.state || filters.district || filters.mobileNumbers.length > 0 || filters.role || filters.statuses.length > 0;
+  const hasActiveFilters = filters.stateId || filters.districtId || filters.mobileNumbers.length > 0 || filters.role || filters.statuses.length > 0;
 
   return (
     <div className="space-y-6">
@@ -252,28 +256,11 @@ const UserManagementTab: React.FC<Props> = ({
               ))}
             </select>
           </div>
-          <div className="min-w-[180px] flex-1">
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-              State
-            </label>
-            <input
-              type="text"
-              placeholder="Filter by state"
-              value={filters.state}
-              onChange={(e) => updateFilters({ state: e.target.value })}
-              className="input-style-compact w-full min-h-[42px] rounded-xl"
-            />
-          </div>
-          <div className="min-w-[180px] flex-1">
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-              District
-            </label>
-            <input
-              type="text"
-              placeholder="Filter by district"
-              value={filters.district}
-              onChange={(e) => updateFilters({ district: e.target.value })}
-              className="input-style-compact w-full min-h-[42px] rounded-xl"
+          <div className="min-w-[320px] flex-[2]">
+            <StateDistrictSelect
+              stateId={filters.stateId}
+              districtId={filters.districtId}
+              onChange={(stateId, districtId) => updateFilters({ stateId, districtId })}
             />
           </div>
         </div>
@@ -336,22 +323,18 @@ const UserManagementTab: React.FC<Props> = ({
             className="input-style-compact w-full"
             required={!editingUser}
           />
-          <input
-            type="text"
-            placeholder="State"
-            value={form.state}
-            onChange={(e) => setForm({ ...form, state: e.target.value })}
-            className="input-style-compact w-full"
+          <StateDistrictSelect
+            stateId={form.stateId}
+            districtId={form.districtId}
+            onChange={(stateId, districtId) => {
+              setForm({ ...form, stateId, districtId });
+              setFieldErrors((p) => ({ ...p, geo: undefined }));
+            }}
             required
           />
-          <input
-            type="text"
-            placeholder="District"
-            value={form.district}
-            onChange={(e) => setForm({ ...form, district: e.target.value })}
-            className="input-style-compact w-full"
-            required
-          />
+          {fieldErrors.geo && (
+            <p className="text-xs text-red-600">{fieldErrors.geo}</p>
+          )}
           <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as 'user' | 'admin' })} className="input-style-compact w-full">
             <option value="user">User</option>
             <option value="admin">Administrator</option>

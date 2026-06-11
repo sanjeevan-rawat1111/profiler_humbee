@@ -1,10 +1,12 @@
+import type { GeoDistrict, GeoState } from './geo';
+
 export type DirectoryDownloadMode = 'normal' | 'master';
 
 export interface SubmissionFilters {
   search: string;
   user: string;
-  state: string;
-  district: string;
+  stateId: string;
+  districtId: string;
   sapCode: string;
   mobileNumber: string;
   fromDate: string;
@@ -97,8 +99,8 @@ export interface AuditFilters {
   search: string;
   name: string;
   user: string;
-  state: string;
-  district: string;
+  stateId: string;
+  districtId: string;
   eventType: string;
   period: DashboardPeriod;
   fromDate: string;
@@ -109,8 +111,8 @@ export const defaultAuditFilters: AuditFilters = {
   search: '',
   name: '',
   user: '',
-  state: '',
-  district: '',
+  stateId: '',
+  districtId: '',
   eventType: '',
   period: 'week',
   fromDate: '',
@@ -123,6 +125,8 @@ export interface DBUser {
   mobileNumber: string;
   role: string;
   region: string;
+  stateId: string | null;
+  districtId: string | null;
   state: string;
   district: string;
   status: string;
@@ -138,14 +142,21 @@ export interface UnifiedDashboardData {
     period: DashboardPeriod;
     fromDate: string;
     toDate: string;
-    states: string[];
-    districts: string[];
+    stateId: string;
+    districtId: string;
     users: string[];
   };
   filterOptions: {
-    states: string[];
-    districts: string[];
-    users: { name: string; mobileNumber: string; state: string; district: string }[];
+    states: GeoState[];
+    districts: GeoDistrict[];
+    users: {
+      name: string;
+      mobileNumber: string;
+      stateId: string | null;
+      districtId: string | null;
+      state: string;
+      district: string;
+    }[];
   };
   summary: {
     totalSubmissions: number;
@@ -178,8 +189,8 @@ export interface GlobalDashboardFilters {
   period: DashboardPeriod;
   fromDate: string;
   toDate: string;
-  states: string[];
-  districts: string[];
+  stateId: string;
+  districtId: string;
   users: string[];
 }
 
@@ -187,22 +198,22 @@ export const defaultGlobalDashboardFilters: GlobalDashboardFilters = {
   period: 'week',
   fromDate: '',
   toDate: '',
-  states: [],
-  districts: [],
+  stateId: '',
+  districtId: '',
   users: [],
 };
 
 export interface UserManagementFilters {
-  state: string;
-  district: string;
+  stateId: string;
+  districtId: string;
   mobileNumbers: string[];
   role: string;
   statuses: string[];
 }
 
 export const defaultUserManagementFilters: UserManagementFilters = {
-  state: '',
-  district: '',
+  stateId: '',
+  districtId: '',
   mobileNumbers: [],
   role: '',
   statuses: [],
@@ -211,8 +222,8 @@ export const defaultUserManagementFilters: UserManagementFilters = {
 export const defaultFilters: SubmissionFilters = {
   search: '',
   user: '',
-  state: '',
-  district: '',
+  stateId: '',
+  districtId: '',
   sapCode: '',
   mobileNumber: '',
   fromDate: '',

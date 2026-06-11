@@ -1,3 +1,3 @@
-export function userGeoFields(state: string, district: string) {
-  return { state, district, region: state };
+export function userGeoFields(stateName: string) {
+  return { region: stateName };
 }

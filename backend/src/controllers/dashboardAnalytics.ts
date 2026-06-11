@@ -24,52 +24,48 @@ function parseUnifiedQuery(query: Record<string, unknown>) {
   const period = String(query.period || 'week');
   const fromDate = String(query.fromDate || '').trim();
   const toDate = String(query.toDate || '').trim();
-  const states = parseArrayParam(query.states ?? query.regions ?? query.state ?? query.region);
-  const districts = parseArrayParam(query.districts ?? query.district);
+  const stateId = String(query.stateId || '').trim();
+  const districtId = String(query.districtId || '').trim();
   const users = parseArrayParam(query.users ?? query.user);
-  return { period, fromDate, toDate, states, districts, users };
+  return { period, fromDate, toDate, stateId, districtId, users };
 }
 
 async function loadAllAnalyticsRows() {
   return prepareAnalyticsRows(await fetchFilteredSubmissions(prisma, parseFilterQuery({})));
 }
 
-async function buildFilterOptions(
-  allRows: ReturnType<typeof prepareAnalyticsRows>,
-  states: string[],
-  districts: string[],
-) {
-  const stateSet = new Set<string>();
-  const districtSet = new Set<string>();
-  allRows.forEach((row) => {
-    if (row.user?.state) stateSet.add(row.user.state);
-    if (row.user?.district) districtSet.add(row.user.district);
-  });
-
-  const userWhere: Record<string, unknown> = {
-    role: 'user',
-    mobileNumber: { notIn: excludedAnalyticsMobileNumbers() },
-  };
-  if (states.length) userWhere.state = { in: states };
-  if (districts.length) userWhere.district = { in: districts };
-
-  const dbUsers = await prisma.user.findMany({
-    where: userWhere,
-    select: { name: true, mobileNumber: true, state: true, district: true },
-    orderBy: { mobileNumber: 'asc' },
-  });
-
-  dbUsers.forEach((user) => {
-    if (user.state) stateSet.add(user.state);
-    if (user.district) districtSet.add(user.district);
-  });
+async function buildFilterOptions(stateId: string) {
+  const [states, districts, dbUsers] = await Promise.all([
+    prisma.state.findMany({
+      select: { id: true, stateName: true, stateCode: true },
+      orderBy: { stateName: 'asc' },
+    }),
+    stateId
+      ? prisma.district.findMany({
+        where: { stateId },
+        select: { id: true, districtName: true, districtCode: true, stateId: true },
+        orderBy: { districtName: 'asc' },
+      })
+      : Promise.resolve([]),
+    prisma.user.findMany({
+      where: {
+        role: 'user',
+        mobileNumber: { notIn: excludedAnalyticsMobileNumbers() },
+        ...(stateId ? { stateId } : {}),
+      },
+      select: { name: true, mobileNumber: true, stateId: true, districtId: true, state: true, district: true },
+      orderBy: { mobileNumber: 'asc' },
+    }),
+  ]);
 
   return {
-    states: [...stateSet].sort(),
-    districts: [...districtSet].sort(),
+    states,
+    districts,
     users: dbUsers.map((user) => ({
       name: user.name,
       mobileNumber: user.mobileNumber,
+      stateId: user.stateId,
+      districtId: user.districtId,
       state: user.state,
       district: user.district,
     })),
@@ -79,16 +75,16 @@ async function buildFilterOptions(
 async function buildInactiveUsers(
   allRows: ReturnType<typeof prepareAnalyticsRows>,
   rangeRows: ReturnType<typeof prepareAnalyticsRows>,
-  states: string[],
-  districts: string[],
+  stateId: string,
+  districtId: string,
   users: string[],
 ) {
   const userWhere: Record<string, unknown> = {
     role: 'user',
     mobileNumber: { notIn: excludedAnalyticsMobileNumbers() },
   };
-  if (states.length) userWhere.state = { in: states };
-  if (districts.length) userWhere.district = { in: districts };
+  if (stateId) userWhere.stateId = stateId;
+  if (districtId) userWhere.districtId = districtId;
   if (users.length) {
     userWhere.mobileNumber = {
       in: users.filter((mobile) => !isExcludedAnalyticsMobile(mobile)),
@@ -104,7 +100,7 @@ async function buildInactiveUsers(
     rangeRows.map((row) => row.user?.mobileNumber).filter(Boolean) as string[],
   );
 
-  const lifetimeByUser = uniqueByUser(filterRowsBySelections(allRows, states, districts, users));
+  const lifetimeByUser = uniqueByUser(filterRowsBySelections(allRows, stateId, districtId, users));
 
   const inactiveList = scopedUsers
     .filter((user) => !activeMobileNumbers.has(user.mobileNumber))
@@ -132,14 +128,14 @@ async function buildInactiveUsers(
 }
 
 export async function getUnifiedDashboard(req: Request, res: Response) {
-  const { period, fromDate, toDate, states, districts, users } = parseUnifiedQuery(req.query);
+  const { period, fromDate, toDate, stateId, districtId, users } = parseUnifiedQuery(req.query);
   try {
     const allRows = await loadAllAnalyticsRows();
-    const filteredRows = filterRowsBySelections(allRows, states, districts, users);
+    const filteredRows = filterRowsBySelections(allRows, stateId, districtId, users);
     const range = resolveDashboardRange(period, fromDate, toDate);
     const rangeRows = rowsInRange(filteredRows, range);
-    const filterOptions = await buildFilterOptions(allRows, states, districts);
-    const inactiveUsers = await buildInactiveUsers(allRows, rangeRows, states, districts, users);
+    const filterOptions = await buildFilterOptions(stateId);
+    const inactiveUsers = await buildInactiveUsers(allRows, rangeRows, stateId, districtId, users);
 
     const byState = uniqueByState(rangeRows);
     const byUser = uniqueByUser(rangeRows);
@@ -188,7 +184,7 @@ export async function getUnifiedDashboard(req: Request, res: Response) {
       success: true,
       data: {
         lastUpdated: new Date().toISOString(),
-        filters: { period, fromDate, toDate, states, districts, users },
+        filters: { period, fromDate, toDate, stateId, districtId, users },
         filterOptions,
         summary: {
           totalSubmissions: countUniqueSubmissions(rangeRows),
@@ -217,7 +213,6 @@ export async function getUnifiedDashboard(req: Request, res: Response) {
   }
 }
 
-// Legacy endpoints kept for backward compatibility
 export async function getTodayDashboard(req: Request, res: Response) {
   req.query = { ...req.query, period: 'today' };
   return getUnifiedDashboard(req, res);

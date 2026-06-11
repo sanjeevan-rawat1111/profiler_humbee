@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import { backfillUserGeoFromText, findGeoByNames, seedGeoMaster } from '../data/seedGeoMaster';
 import { userGeoFields } from '../utils/userGeo';
 
 const prisma = new PrismaClient();
@@ -10,24 +11,24 @@ const DEFAULT_USERS = [
     mobileNumber: '9000000001',
     password: 'Admin1234',
     role: 'admin' as const,
-    state: 'HUMBEE',
-    district: 'HQ',
+    stateName: 'Delhi',
+    districtName: 'New Delhi',
   },
   {
     name: 'Demo Officer',
     mobileNumber: '9000000002',
     password: 'User1234',
     role: 'user' as const,
-    state: 'HUMBEE',
-    district: 'Central',
+    stateName: 'Uttar Pradesh',
+    districtName: 'Ghaziabad',
   },
   {
     name: 'Heartbeat User',
     mobileNumber: '0000000000',
     password: 'Ping@20p95',
     role: 'user' as const,
-    state: 'SYSTEM',
-    district: 'System',
+    stateName: 'Delhi',
+    districtName: 'New Delhi',
   },
 ];
 
@@ -36,26 +37,28 @@ async function ensureUser(
   mobileNumber: string,
   password: string,
   role: 'admin' | 'user',
-  state: string,
-  district: string,
+  stateName: string,
+  districtName: string,
 ) {
+  const geo = await findGeoByNames(stateName, districtName);
+  if (!geo) {
+    throw new Error(`Geo master missing for ${stateName} / ${districtName}`);
+  }
+
   const existing = await prisma.user.findUnique({ where: { mobileNumber } });
   if (existing) {
-    const updates: Record<string, string> = {};
-    if (!existing.name) updates.name = name;
-    if (!existing.state) updates.state = state;
-    if (!existing.district) updates.district = district;
-    if (Object.keys(updates).length) {
-      const nextState = updates.state ?? (existing.state || state);
-      const nextDistrict = updates.district ?? (existing.district || district);
-      await prisma.user.update({
-        where: { mobileNumber },
-        data: { ...updates, ...userGeoFields(nextState, nextDistrict) },
-      });
-      console.log(`- Updated fields for ${mobileNumber}`);
-    } else {
-      console.log(`- Skipped ${mobileNumber} (already exists)`);
-    }
+    await prisma.user.update({
+      where: { mobileNumber },
+      data: {
+        name,
+        stateId: geo.stateId,
+        districtId: geo.districtId,
+        state: geo.stateName,
+        district: geo.districtName,
+        ...userGeoFields(geo.stateName),
+      },
+    });
+    console.log(`- Updated ${mobileNumber}`);
     return;
   }
 
@@ -67,17 +70,34 @@ async function ensureUser(
       passwordHash,
       plainPassword: password,
       role,
-      ...userGeoFields(state, district),
+      stateId: geo.stateId,
+      districtId: geo.districtId,
+      state: geo.stateName,
+      district: geo.districtName,
+      ...userGeoFields(geo.stateName),
     },
   });
-  console.log(`- Created ${role} user: ${name} (${mobileNumber}, ${state}/${district})`);
+  console.log(`- Created ${role} user: ${name} (${mobileNumber}, ${geo.stateName}/${geo.districtName})`);
 }
 
 async function main() {
   console.log('Seeding database...');
 
+  const geo = await seedGeoMaster();
+  console.log(`- Geo master: ${geo.stateCount} states, ${geo.districtCount} districts`);
+
+  const backfilled = await backfillUserGeoFromText();
+  if (backfilled) console.log(`- Backfilled geo for ${backfilled} existing user(s)`);
+
   for (const user of DEFAULT_USERS) {
-    await ensureUser(user.name, user.mobileNumber, user.password, user.role, user.state, user.district);
+    await ensureUser(
+      user.name,
+      user.mobileNumber,
+      user.password,
+      user.role,
+      user.stateName,
+      user.districtName,
+    );
   }
 
   console.log('Database seed complete.');

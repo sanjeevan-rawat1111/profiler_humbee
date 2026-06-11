@@ -4,6 +4,11 @@ const mobileNumberField = z.string().trim()
   .min(1, 'Mobile Number is required.')
   .regex(/^[0-9]{10}$/, 'Please enter a valid 10-digit Mobile Number.');
 
+const geoFields = {
+  stateId: z.string().trim().uuid('Please select a valid State'),
+  districtId: z.string().trim().uuid('Please select a valid District'),
+};
+
 export const loginSchema = z.object({
   mobileNumber: mobileNumberField,
   password: z.string()
@@ -21,8 +26,7 @@ export const createUserSchema = z.object({
   password: z.string()
     .regex(/^(?=.*[A-Z])(?=.*\d).{6,}$/, 'Password must be at least 6 characters, contain 1 uppercase letter and 1 number'),
   role: z.enum(['user', 'admin']).optional().default('user'),
-  state: z.string().trim().min(1, 'State is required'),
-  district: z.string().trim().min(1, 'District is required'),
+  ...geoFields,
   status: z.enum(['active', 'inactive']).optional().default('active'),
 });
 
@@ -33,10 +37,13 @@ export const updateUserSchema = z.object({
     .regex(/^(?=.*[A-Z])(?=.*\d).{6,}$/, 'Password must be at least 6 characters, contain 1 uppercase letter and 1 number')
     .optional(),
   role: z.enum(['user', 'admin']).optional(),
-  state: z.string().trim().min(1).optional(),
-  district: z.string().trim().min(1).optional(),
+  stateId: geoFields.stateId.optional(),
+  districtId: geoFields.districtId.optional(),
   status: z.enum(['active', 'inactive']).optional(),
-});
+}).refine(
+  (data) => (data.stateId === undefined) === (data.districtId === undefined),
+  { message: 'State and District must be updated together', path: ['districtId'] },
+);
 
 export const submissionsQuerySchema = z.object({
   sapCode: z.string().optional(),

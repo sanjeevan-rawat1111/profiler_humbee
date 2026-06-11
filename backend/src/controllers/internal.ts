@@ -4,21 +4,37 @@ import prisma from '../prisma/client';
 import { excludedAnalyticsMobileNumbers, isExcludedAnalyticsMobile } from '../config/excludedAnalyticsUsers';
 import { sendCsv, sendExcel } from '../utils/exportHelpers';
 import { parseArrayParam } from '../utils/dashboardAnalytics';
+import { resolveGeoIds } from '../data/seedGeoMaster';
 import { userGeoFields } from '../utils/userGeo';
 
+const userListSelect = {
+  id: true,
+  name: true,
+  mobileNumber: true,
+  role: true,
+  region: true,
+  stateId: true,
+  districtId: true,
+  state: true,
+  district: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 function parseUserListQuery(query: Record<string, unknown>) {
-  const state = String(query.state || query.region || '').trim();
-  const district = String(query.district || '').trim();
+  const stateId = String(query.stateId || '').trim();
+  const districtId = String(query.districtId || '').trim();
   const role = String(query.role || '').trim();
   const mobileNumbers = parseArrayParam(query.mobileNumbers ?? query.users ?? query.user);
   const statuses = parseArrayParam(query.status ?? query.statuses).map((value) => value.toLowerCase());
-  return { state, district, role, mobileNumbers, statuses };
+  return { stateId, districtId, role, mobileNumbers, statuses };
 }
 
 function buildUserListWhere(filters: ReturnType<typeof parseUserListQuery>) {
   const where: Record<string, unknown> = {};
-  if (filters.state) where.state = { contains: filters.state, mode: 'insensitive' };
-  if (filters.district) where.district = { contains: filters.district, mode: 'insensitive' };
+  if (filters.stateId) where.stateId = filters.stateId;
+  if (filters.districtId) where.districtId = filters.districtId;
   if (filters.role) where.role = filters.role;
   if (filters.mobileNumbers.length) where.mobileNumber = { in: filters.mobileNumbers };
   if (filters.statuses.length) where.status = { in: filters.statuses };
@@ -37,7 +53,7 @@ export async function getUsers(req: Request, res: Response) {
     const [users, allMobileNumbers] = await Promise.all([
       prisma.user.findMany({
         where: buildUserListWhere(filters),
-        select: { id: true, name: true, mobileNumber: true, role: true, region: true, state: true, district: true, status: true, createdAt: true, updatedAt: true },
+        select: userListSelect,
         orderBy: { createdAt: 'desc' },
       }),
       prisma.user.findMany({
@@ -59,8 +75,13 @@ export async function getUsers(req: Request, res: Response) {
 }
 
 export async function createUser(req: Request, res: Response) {
-  const { name, mobileNumber, password, role, status, state, district } = req.body;
+  const { name, mobileNumber, password, role, status, stateId, districtId } = req.body;
   try {
+    const geo = await resolveGeoIds(stateId, districtId);
+    if (!geo) {
+      return res.status(400).json({ success: false, message: 'Invalid State and District combination.' });
+    }
+
     const existingMobile = await prisma.user.findUnique({ where: { mobileNumber } });
     if (existingMobile) {
       return res.status(400).json({ success: false, message: 'Mobile Number already exists.' });
@@ -72,10 +93,14 @@ export async function createUser(req: Request, res: Response) {
         passwordHash: await hashPassword(password),
         plainPassword: password,
         role: role || 'user',
-        ...userGeoFields(state, district),
+        stateId: geo.stateId,
+        districtId: geo.districtId,
+        state: geo.stateName,
+        district: geo.districtName,
+        ...userGeoFields(geo.stateName),
         status: status || 'active',
       },
-      select: { id: true, name: true, mobileNumber: true, role: true, region: true, state: true, district: true, status: true, createdAt: true },
+      select: userListSelect,
     });
     return res.status(201).json({ success: true, data: user });
   } catch (error) {
@@ -86,7 +111,7 @@ export async function createUser(req: Request, res: Response) {
 
 export async function updateUser(req: Request, res: Response) {
   const { id } = req.params;
-  const { name, mobileNumber, password, role, status, state, district } = req.body;
+  const { name, mobileNumber, password, role, status, stateId, districtId } = req.body;
   try {
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) {
@@ -105,14 +130,27 @@ export async function updateUser(req: Request, res: Response) {
     }
     if (role) updateData.role = role;
     if (status) updateData.status = status;
-    if (state !== undefined || district !== undefined) {
-      Object.assign(updateData, userGeoFields(state ?? existing.state, district ?? existing.district));
+    if (stateId !== undefined || districtId !== undefined) {
+      const geo = await resolveGeoIds(
+        stateId ?? existing.stateId ?? '',
+        districtId ?? existing.districtId ?? '',
+      );
+      if (!geo) {
+        return res.status(400).json({ success: false, message: 'Invalid State and District combination.' });
+      }
+      Object.assign(updateData, {
+        stateId: geo.stateId,
+        districtId: geo.districtId,
+        state: geo.stateName,
+        district: geo.districtName,
+        ...userGeoFields(geo.stateName),
+      });
     }
 
     const updated = await prisma.user.update({
       where: { id },
       data: updateData,
-      select: { id: true, name: true, mobileNumber: true, role: true, region: true, state: true, district: true, status: true, updatedAt: true },
+      select: userListSelect,
     });
     return res.status(200).json({ success: true, data: updated });
   } catch (error) {
