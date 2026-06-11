@@ -48,7 +48,7 @@ export async function createSubmission(req: AuthenticatedRequest, res: Response)
     });
   }
 
-  const { sapCode, mobileNumber } = req.body;
+  const { sapCode, mobileNumber } = req.body as { sapCode: string; mobileNumber: string };
 
   try {
     const response = await fetch(HUMBEE_API_URL, {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ChevronUp, ChevronDown, X } from 'lucide-react';
 import api from '../../services/api';
 import type { DirectoryRecord, SubmissionDetail, SubmissionFilters } from '../../types/admin';
-import { buildFilterParams, formatDateTime } from '../../utils/adminApi';
+import { buildFilterParams, formatDateTime, formatVcpMobile } from '../../utils/adminApi';
 
 interface Props {
   filters: SubmissionFilters;
@@ -102,7 +102,7 @@ const UserDirectoryTab: React.FC<Props> = ({
                     <td className="p-4 text-slate-600">{record.state}</td>
                     <td className="p-4 text-slate-600">{record.district}</td>
                     <td className="p-4 font-mono text-humbee-600">{record.sapCode}</td>
-                    <td className="p-4 font-mono">{record.mobileNumber}</td>
+                    <td className="p-4 font-mono">{formatVcpMobile(record.mobileNumber)}</td>
                     <td className="p-4 font-bold">{record.submissionCount}</td>
                     <td className="p-4 text-slate-400">{formatDateTime(record.firstSubmission)}</td>
                     <td className="p-4 text-amber-700 font-semibold">{formatDateTime(record.lastSubmission)}</td>
@@ -154,7 +154,7 @@ const UserDirectoryTab: React.FC<Props> = ({
                 <p className="text-sm text-slate-500">
                   SAP Code: <span className="font-mono font-semibold text-humbee-600">{selectedUser.sapCode}</span>
                   {' · '}
-                  VCP Mobile: <span className="font-mono font-semibold text-slate-700">{selectedUser.mobileNumber}</span>
+                  VCP Mobile: <span className="font-mono font-semibold text-slate-700">{formatVcpMobile(selectedUser.mobileNumber)}</span>
                 </p>
                 <p className="text-sm text-slate-500">
                   Submission Count: <span className="font-semibold text-slate-700">{selectedUser.submissionCount}</span>
@@ -179,7 +179,7 @@ const UserDirectoryTab: React.FC<Props> = ({
                   {details.map((d) => (
                     <tr key={d.id}>
                       <td className="p-2 font-mono text-humbee-600">{d.sapCode}</td>
-                      <td className="p-2 font-mono">{d.mobileNumber}</td>
+                      <td className="p-2 font-mono">{formatVcpMobile(d.mobileNumber)}</td>
                       <td className="p-2">{formatDateTime(d.timestamp)}</td>
                     </tr>
                   ))}

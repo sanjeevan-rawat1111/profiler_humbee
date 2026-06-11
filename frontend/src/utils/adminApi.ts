@@ -103,6 +103,11 @@ export function formatCount(value: unknown) {
   return Math.round(Number(value) || 0);
 }
 
+export function formatVcpMobile(value: string | null | undefined) {
+  const trimmed = String(value ?? '').trim();
+  return trimmed || '—';
+}
+
 export function formatDateTime(value: string) {
   return new Date(value).toLocaleString(undefined, {
     day: '2-digit',

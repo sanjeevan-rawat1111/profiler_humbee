@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { RefreshCw, Trophy, Calendar, Users, TrendingUp, Clock, Activity } from 'lucide-react';
 import type { KpiDashboardData } from '../../types/admin';
-import { formatDateTime } from '../../utils/adminApi';
+import { formatDateTime, formatVcpMobile } from '../../utils/adminApi';
 
 const COLORS = ['#349688', '#f59e0b', '#3b82f6', '#8b5cf6', '#ef4444', '#06b6d4'];
 
@@ -216,7 +216,7 @@ const KpiDashboardTab: React.FC<Props> = ({ data, loading, rankingSort, onRankin
                 <td className="p-4 text-slate-600">{row.state}</td>
                 <td className="p-4 text-slate-600">{row.district}</td>
                 <td className="p-4 font-mono text-humbee-600">{row.sapCode}</td>
-                <td className="p-4 font-mono">{row.customerMobileNumber}</td>
+                <td className="p-4 font-mono">{formatVcpMobile(row.customerMobileNumber)}</td>
               </tr>
             ))}
           </tbody>

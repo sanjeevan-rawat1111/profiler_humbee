@@ -15,10 +15,24 @@ export const loginSchema = z.object({
     .regex(/^(?=.*[A-Z])(?=.*\d).{6,}$/, 'Password must be at least 6 characters, contain 1 uppercase letter and 1 number'),
 });
 
+const normalizeOptionalString = (value: unknown) => (value == null ? '' : String(value));
+
+const optionalVcpMobileField = z.preprocess(
+  normalizeOptionalString,
+  z.string().trim().refine(
+    (value) => value === '' || /^[0-9]{10}$/.test(value),
+    'Mobile number must be exactly 10 digits when provided',
+  ),
+);
+
 export const submissionSchema = z.object({
   sapCode: z.string().trim().min(1, 'SAP Code is required'),
-  mobileNumber: z.string().trim().regex(/^[0-9]{10}$/, 'Mobile number must be exactly 10 digits'),
-});
+  mobileNumber: optionalVcpMobileField.optional().default(''),
+  vcpMobile: optionalVcpMobileField.optional(),
+}).transform((data) => ({
+  sapCode: data.sapCode,
+  mobileNumber: data.mobileNumber || data.vcpMobile || '',
+}));
 
 const managerRegionFields = {
   assignedRegionIds: z.array(z.string().uuid()).optional().default([]),
