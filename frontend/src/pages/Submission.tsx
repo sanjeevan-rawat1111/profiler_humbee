@@ -4,6 +4,64 @@ import api from '../services/api';
 import { LogOut, Send, AlertCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
+const PROFILE_ERROR = 'Unable to open customer profile. Please try again.';
+
+function safeCloseTab(tab: Window | null | undefined): void {
+  if (!tab || tab.closed) return;
+  try {
+    tab.close();
+  } catch {
+    // Tab may already be closed or inaccessible.
+  }
+}
+
+function openBlankTab(): Window | null {
+  try {
+    return window.open('about:blank', '_blank');
+  } catch {
+    return null;
+  }
+}
+
+function extractPwaUrl(data: Record<string, unknown>): string | null {
+  const nested = data.data;
+  const fromNested =
+    nested && typeof nested === 'object' && !Array.isArray(nested)
+      ? (nested as Record<string, unknown>).pwaUrl
+      : undefined;
+  const candidate = data.pwaUrl ?? fromNested;
+  if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+  return null;
+}
+
+function collectStrings(value: unknown, out: string[] = []): string[] {
+  if (typeof value === 'string') {
+    out.push(value);
+    return out;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectStrings(item, out));
+    return out;
+  }
+  if (value && typeof value === 'object') {
+    Object.values(value).forEach((v) => collectStrings(v, out));
+  }
+  return out;
+}
+
+function findInvalidSapCodeMessage(payload: unknown): string | null {
+  const match = collectStrings(payload).find((s) => /invalid sap code/i.test(s.trim()));
+  return match?.trim() ?? null;
+}
+
+function getResponsePayload(error: unknown): unknown {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const response = (error as { response?: { data?: unknown } }).response;
+    return response?.data;
+  }
+  return undefined;
+}
+
 const Submission: React.FC = () => {
   const { user, logout } = useAuth();
   const [sapCode, setSapCode] = useState('');
@@ -29,6 +87,8 @@ const Submission: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     setError(null);
     setSuccessMsg(null);
 
@@ -36,24 +96,58 @@ const Submission: React.FC = () => {
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
+    const pwaTab = openBlankTab();
     setIsSubmitting(true);
+
+    const handleFailure = (actualError: unknown, responsePayload?: unknown) => {
+      console.error('Submission failed', actualError);
+      safeCloseTab(pwaTab);
+      setIsSubmitting(false);
+
+      const invalidSapMsg = findInvalidSapCodeMessage(responsePayload ?? getResponsePayload(actualError));
+      if (invalidSapMsg) {
+        setError(invalidSapMsg);
+        return;
+      }
+
+      setError(PROFILE_ERROR);
+    };
+
     try {
       const res = await api.post('/api/submission', {
         sapCode: sapCode.trim(),
         mobileNumber: mobileNumber.trim(),
       });
 
-      // Handle both old and new response shape
-      const pwaUrl = res.data.data?.pwaUrl ?? res.data.pwaUrl;
+      const payload = res.data as Record<string, unknown>;
+      if (payload.success === false) {
+        handleFailure(payload, payload);
+        return;
+      }
+
+      const pwaUrl = extractPwaUrl(payload);
+      if (!pwaUrl) {
+        console.warn('Submission succeeded but PWA URL is missing');
+        handleFailure({ reason: 'missing pwa url', response: payload }, payload);
+        return;
+      }
+
+      if (pwaTab) {
+        pwaTab.location.href = pwaUrl;
+      } else {
+        const fallbackTab = window.open(pwaUrl, '_blank');
+        if (!fallbackTab) {
+          handleFailure({ reason: 'popup blocked', response: payload }, payload);
+          return;
+        }
+      }
 
       confetti({ particleCount: 120, spread: 75, origin: { y: 0.6 }, colors: ['#349688', '#FFA525', '#BF7000'] });
       setSuccessMsg('Launching secure PWA module…');
-
-      setTimeout(() => { window.location.href = pwaUrl; }, 1200);
-    } catch (err: any) {
       setIsSubmitting(false);
-      const msg = err.response?.data?.message ?? err.response?.data?.error ?? 'Submission failed. Please try again.';
-      setError(msg);
+      window.setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (err: unknown) {
+      handleFailure(err, getResponsePayload(err));
     }
   };
 
