@@ -1,16 +1,18 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import api from '../../services/api';
+import { loadRegionsList } from '../../services/regionsListCache';
 import type { GeoRegionDetail, GeoState } from '../../types/geo';
 import { formatDateTime } from '../../utils/adminApi';
 
 interface Props {
   setError: (msg: string | null) => void;
+  catalogStates?: GeoState[];
+  onGeoRefresh?: () => Promise<unknown>;
 }
 
-const RegionManagementTab: React.FC<Props> = ({ setError }) => {
+const RegionManagementTab: React.FC<Props> = ({ setError, catalogStates = [], onGeoRefresh }) => {
   const [regions, setRegions] = useState<GeoRegionDetail[]>([]);
-  const [allStates, setAllStates] = useState<GeoState[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [regionName, setRegionName] = useState('');
@@ -18,16 +20,11 @@ const RegionManagementTab: React.FC<Props> = ({ setError }) => {
   const [selectedStateIds, setSelectedStateIds] = useState<string[]>([]);
   const [showForm, setShowForm] = useState(false);
 
-  const fetchData = useCallback(async () => {
+  const fetchRegions = useCallback(async (force = false) => {
     setLoading(true);
     setError(null);
     try {
-      const [regionsRes, statesRes] = await Promise.all([
-        api.get('/api/internal/regions'),
-        api.get('/api/internal/geo/states'),
-      ]);
-      setRegions(regionsRes.data.data ?? []);
-      setAllStates(statesRes.data.data ?? []);
+      setRegions(await loadRegionsList(force));
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load regions');
     } finally {
@@ -36,8 +33,8 @@ const RegionManagementTab: React.FC<Props> = ({ setError }) => {
   }, [setError]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchRegions();
+  }, [fetchRegions]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -87,7 +84,8 @@ const RegionManagementTab: React.FC<Props> = ({ setError }) => {
         await api.post('/api/internal/regions', payload);
       }
       resetForm();
-      fetchData();
+      await onGeoRefresh?.();
+      await fetchRegions(true);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to save region');
     }
@@ -97,7 +95,8 @@ const RegionManagementTab: React.FC<Props> = ({ setError }) => {
     if (!window.confirm('Delete this region? States will be unassigned.')) return;
     try {
       await api.delete(`/api/internal/regions/${id}`);
-      fetchData();
+      await onGeoRefresh?.();
+      await fetchRegions(true);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to delete region');
     }
@@ -138,7 +137,7 @@ const RegionManagementTab: React.FC<Props> = ({ setError }) => {
               Map States
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto border border-slate-100 rounded-xl p-3">
-              {allStates.map((state) => (
+              {catalogStates.map((state) => (
                 <label key={state.id} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
                   <input
                     type="checkbox"

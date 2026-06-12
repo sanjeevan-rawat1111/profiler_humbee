@@ -5,6 +5,7 @@ import SearchableMultiSelect from './SearchableMultiSelect';
 import RegionStateDistrictSelect from '../RegionStateDistrictSelect';
 import ManagerRegionSelect from '../ManagerRegionSelect';
 import type { DBUser, UserManagementFilters } from '../../types/admin';
+import type { GeoRegion, GeoState } from '../../types/geo';
 import { defaultUserManagementFilters } from '../../types/admin';
 import { fetchFilterNameOptions, formatDateTime } from '../../utils/adminApi';
 
@@ -29,6 +30,8 @@ interface Props {
   onExportCsv: () => void;
   onExportExcel: () => void;
   setError: (msg: string | null) => void;
+  catalogRegions?: GeoRegion[];
+  catalogStates?: GeoState[];
 }
 
 const UserManagementTab: React.FC<Props> = ({
@@ -42,6 +45,8 @@ const UserManagementTab: React.FC<Props> = ({
   onExportCsv,
   onExportExcel,
   setError,
+  catalogRegions,
+  catalogStates,
 }) => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -299,6 +304,8 @@ const UserManagementTab: React.FC<Props> = ({
               stateId={filters.stateId}
               districtId={filters.districtId}
               onChange={(regionId, stateId, districtId) => updateFilters({ regionId, stateId, districtId })}
+              catalogRegions={catalogRegions}
+              catalogStates={catalogStates}
             />
           </div>
         </div>
@@ -384,6 +391,8 @@ const UserManagementTab: React.FC<Props> = ({
                 setForm({ ...form, regionId, stateId, districtId });
                 setFieldErrors((p) => ({ ...p, geo: undefined }));
               }}
+              catalogRegions={catalogRegions}
+              catalogStates={catalogStates}
             />
           )}
           {fieldErrors.geo && <p className="text-xs text-red-600">{fieldErrors.geo}</p>}

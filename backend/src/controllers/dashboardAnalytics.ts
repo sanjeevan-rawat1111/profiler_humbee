@@ -110,17 +110,30 @@ export async function getUnifiedDashboard(req: AuthenticatedRequest, res: Respon
   const scope = req.geographyScope ?? { unrestricted: true, districtIds: [], stateIds: [], regionIds: [] };
 
   try {
-    const allRows = await loadScopedAnalyticsRows(req, { skipDate: true });
-    const stateRegionMap = await loadStateRegionMap();
+    const [
+      allRows,
+      stateRegionMap,
+      filterOptions,
+    ] = await Promise.all([
+      loadScopedAnalyticsRows(req, { skipDate: true }),
+      loadStateRegionMap(),
+      buildScopedFilterOptions(
+        scope,
+        filters.regionId,
+        filters.stateId,
+      ),
+    ]);
+    // const allRows = await loadScopedAnalyticsRows(req, { skipDate: true });
+    // const stateRegionMap = await loadStateRegionMap();
     const range = resolveDashboardRange(filters.period, filters.fromDate, filters.toDate);
     const rangeRows = rowsInRange(allRows, range);
-    const filterOptions = await buildScopedFilterOptions(scope, filters.regionId, filters.stateId);
-    const inactiveUsers = await buildInactiveUsers(allRows, rangeRows, filters, scope);
-
+    // const filterOptions = await buildScopedFilterOptions(scope, filters.regionId, filters.stateId);
+    const inactiveUsersPromise = buildInactiveUsers(allRows, rangeRows, filters, scope);
     const byState = uniqueByState(rangeRows);
     const byRegion = uniqueByRegion(rangeRows, stateRegionMap);
     const byDistrict = uniqueByDistrict(rangeRows);
     const byUser = uniqueByUser(rangeRows);
+    const inactiveUsers = await inactiveUsersPromise;
 
     const regionTotalChart = Array.from(byRegion.entries())
       .map(([region, keys]) => ({ region, uniqueCount: keys.size }))

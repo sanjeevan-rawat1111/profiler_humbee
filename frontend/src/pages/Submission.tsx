@@ -60,21 +60,21 @@ const Submission: React.FC = () => {
   return (
     <div className="min-h-screen gradient-bg flex flex-col">
       {/* Navbar */}
-      <header className="w-full bg-white/80 backdrop-blur-md border-b border-slate-100 py-0 px-6 md:px-10 flex justify-between items-center sticky top-0 z-30 h-16">
-        <div className="flex items-center gap-3">
-          <img src="/logo.svg" alt="Humbee" className="h-8 object-contain" />
+      <header className="w-full bg-white/80 backdrop-blur-md border-b border-slate-100 px-3 sm:px-6 md:px-10 flex justify-between items-center gap-2 sticky top-0 z-30 min-h-16 py-2 sm:py-0">
+        <div className="flex items-center shrink-0">
+          <img src="/logo.svg" alt="Humbee" className="h-7 sm:h-8 object-contain" />
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
-            <span className="text-xs font-bold text-slate-700 block">{user?.name}</span>
-          </div>
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+          <span className="text-[10px] sm:text-xs font-bold text-slate-700 truncate max-w-[32vw] min-[375px]:max-w-[40vw] sm:max-w-none">
+            {user?.name}
+          </span>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 hover:border-red-200 hover:bg-red-50 text-slate-500 hover:text-red-600 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+            className="flex items-center gap-1 shrink-0 px-2 sm:px-3 py-2 border border-slate-200 hover:border-red-200 hover:bg-red-50 text-slate-500 hover:text-red-600 rounded-lg text-[10px] sm:text-xs font-semibold transition-all cursor-pointer"
           >
-            <LogOut className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Logout</span>
+            <LogOut className="w-3.5 h-3.5 shrink-0" />
+            <span>Logout</span>
           </button>
         </div>
       </header>

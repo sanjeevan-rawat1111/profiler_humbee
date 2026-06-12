@@ -20,6 +20,12 @@ import type {
   UnifiedDashboardData,
 } from '../types/admin';
 import { buildAuditParams, buildFilterParams, buildUserMgmtParams, downloadExport } from '../utils/adminApi';
+import {
+  buildUsersCacheKey,
+  getUsersCache,
+  invalidateUsersCache,
+  setUsersCache,
+} from '../services/usersCache';
 
 type MainTab = 'submissions' | 'management' | 'audit';
 type SubmissionTab = 'directory' | 'kpi';
@@ -73,18 +79,42 @@ const AdminDashboard: React.FC = () => {
     }
   }, [filters, directoryPage, sortBy, sortDir]);
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (force = false) => {
+    const cacheKey = buildUsersCacheKey(userMgmtFilters);
+
+    if (!force) {
+      const cached = getUsersCache(cacheKey);
+      if (cached) {
+        console.log('Users cache HIT', cacheKey);
+        setUsers(cached.users);
+        setMobileNumberFilterOptions(cached.mobileNumbers);
+        return;
+      }
+      console.log('Users cache MISS', cacheKey);
+    } else {
+      invalidateUsersCache();
+      console.log('Users cache MISS', cacheKey);
+    }
+
+    console.log('Users API FETCH', cacheKey);
     setLoadingUsers(true);
     try {
       const res = await api.get('/api/internal/users', { params: buildUserMgmtParams(userMgmtFilters) });
       const data = res.data.data ?? res.data;
+      let nextUsers: DBUser[] = [];
+      let nextMobileNumbers: string[] = [];
+
       if (Array.isArray(data)) {
-        setUsers(data);
-        setMobileNumberFilterOptions(data.map((user: DBUser) => user.mobileNumber));
+        nextUsers = data;
+        nextMobileNumbers = data.map((user: DBUser) => user.mobileNumber);
       } else {
-        setUsers(data.users || []);
-        setMobileNumberFilterOptions(data.filterOptions?.mobileNumbers || []);
+        nextUsers = data.users || [];
+        nextMobileNumbers = data.filterOptions?.mobileNumbers || [];
       }
+
+      setUsers(nextUsers);
+      setMobileNumberFilterOptions(nextMobileNumbers);
+      setUsersCache(cacheKey, { users: nextUsers, mobileNumbers: nextMobileNumbers });
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch users');
     } finally {
@@ -156,7 +186,7 @@ const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     if (mainTab !== 'management' || managementSubTab !== 'users') return;
-    const timer = setTimeout(() => fetchUsers(), 300);
+    const timer = setTimeout(() => { void fetchUsers(); }, 300);
     return () => clearTimeout(timer);
   }, [userMgmtFilters, mainTab, managementSubTab, fetchUsers]);
 
@@ -253,7 +283,7 @@ const AdminDashboard: React.FC = () => {
           userMgmtFilters={userMgmtFilters}
           onUserMgmtFiltersChange={setUserMgmtFilters}
           currentUserId={user?.id}
-          onRefreshUsers={fetchUsers}
+          onRefreshUsers={() => { void fetchUsers(true); }}
           onExportUsersCsv={() => downloadExport('/api/internal/users/export-csv', 'users.csv', buildUserMgmtParams(userMgmtFilters))}
           onExportUsersExcel={() => downloadExport('/api/internal/users/export-excel', 'users.xls', buildUserMgmtParams(userMgmtFilters))}
           setError={setError}

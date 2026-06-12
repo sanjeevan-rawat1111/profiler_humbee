@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
+import { loadStates } from '../services/geoCatalog';
 import type { GeoDistrict, GeoState } from '../types/geo';
 
 interface Props {
@@ -31,10 +32,10 @@ const StateDistrictSelect: React.FC<Props> = ({
   useEffect(() => {
     let active = true;
     setLoadingStates(true);
-    api.get('/api/internal/geo/states')
-      .then((res) => {
+    loadStates()
+      .then((data) => {
         if (!active) return;
-        setStates(res.data.data ?? []);
+        setStates(data);
       })
       .finally(() => {
         if (active) setLoadingStates(false);

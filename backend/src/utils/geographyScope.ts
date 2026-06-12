@@ -1,6 +1,7 @@
 import prisma from '../prisma/client';
 import { excludedAnalyticsMobileNumbers } from '../config/excludedAnalyticsUsers';
 import type { SubmissionRow, parseFilterQuery } from './submissionFilters';
+import { getCache, setCache, isCacheValid } from './geographyCache';
 
 export type GeographyScope = {
   unrestricted: boolean;
@@ -10,11 +11,29 @@ export type GeographyScope = {
 };
 
 export async function resolveRegionStateIds(regionId: string): Promise<string[]> {
+  const cache = getCache();
+
+  if (
+    isCacheValid() &&
+    cache.regionStateMap?.has(regionId)
+  ) {
+    return cache.regionStateMap.get(regionId)!;
+  }
   const mappings = await prisma.regionState.findMany({
     where: { regionId },
     select: { stateId: true },
   });
-  return mappings.map((mapping) => mapping.stateId);
+  const stateIds = mappings.map((m) => m.stateId);
+
+  const map = cache.regionStateMap ?? new Map();
+
+  map.set(regionId, stateIds);
+
+  setCache({
+    regionStateMap: map,
+  });
+
+  return stateIds;
 }
 
 export async function resolveGeographyScope(userId: string, role: string): Promise<GeographyScope> {
@@ -111,14 +130,23 @@ export function filterRowsByGeographyScope(rows: SubmissionRow[], scope: Geograp
 }
 
 export async function loadStateRegionMap(): Promise<Map<string, { regionId: string | null; regionName: string }>> {
-  const mappings = await prisma.regionState.findMany({
-    select: {
-      stateId: true,
-      regionId: true,
-      region: { select: { regionName: true } },
-    },
-  });
-  const allStates = await prisma.state.findMany({ select: { id: true } });
+  const cache = getCache();
+
+  if (isCacheValid() && cache.stateRegionMap) {
+    return cache.stateRegionMap;
+  }
+
+  const [mappings, allStates] = await Promise.all([
+    prisma.regionState.findMany({
+      select: {
+        stateId: true,
+        regionId: true,
+        region: { select: { regionName: true } },
+      },
+    }),
+    prisma.state.findMany({ select: { id: true } }),
+  ]);
+
   const map = new Map<string, { regionId: string | null; regionName: string }>();
   allStates.forEach((state) => {
     map.set(state.id, { regionId: null, regionName: 'Unassigned' });
@@ -129,6 +157,8 @@ export async function loadStateRegionMap(): Promise<Map<string, { regionId: stri
       regionName: mapping.region.regionName,
     });
   });
+
+  setCache({ stateRegionMap: map });
   return map;
 }
 
@@ -195,15 +225,30 @@ export async function buildScopedFilterOptions(scope: GeographyScope, regionId: 
     }),
   ]);
 
-  const statesWithRegion = await Promise.all(
-    states.map(async (state) => {
-      const mapping = await prisma.regionState.findUnique({
-        where: { stateId: state.id },
-        select: { regionId: true },
-      });
-      return { ...state, regionId: mapping?.regionId ?? null };
-    }),
+  // const statesWithRegion = await Promise.all(
+  //   states.map(async (state) => {
+  //     const mapping = await prisma.regionState.findUnique({
+  //       where: { stateId: state.id },
+  //       select: { regionId: true },
+  //     });
+  //     return { ...state, regionId: mapping?.regionId ?? null };
+  //   }),
+  // );
+  const mappings = await prisma.regionState.findMany({
+    select: {
+      stateId: true,
+      regionId: true,
+    },
+  });
+  
+  const mappingMap = new Map(
+    mappings.map((m) => [m.stateId, m.regionId])
   );
+  
+  const statesWithRegion = states.map((state) => ({
+    ...state,
+    regionId: mappingMap.get(state.id) ?? null,
+  }));
 
   return {
     regions,

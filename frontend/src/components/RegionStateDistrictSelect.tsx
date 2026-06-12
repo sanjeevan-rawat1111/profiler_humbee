@@ -1,6 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import api from '../services/api';
+import { loadRegions, loadStates } from '../services/geoCatalog';
 import type { GeoDistrict, GeoRegion, GeoState } from '../types/geo';
+
+function filterStatesByRegion(states: GeoState[], regionId: string) {
+  if (!regionId) return states;
+  return states.filter((state) => state.regionId === regionId);
+}
 
 interface Props {
   regionId: string;
@@ -10,6 +16,8 @@ interface Props {
   disabled?: boolean;
   showRegion?: boolean;
   className?: string;
+  catalogRegions?: GeoRegion[];
+  catalogStates?: GeoState[];
 }
 
 const RegionStateDistrictSelect: React.FC<Props> = ({
@@ -20,32 +28,49 @@ const RegionStateDistrictSelect: React.FC<Props> = ({
   disabled = false,
   showRegion = true,
   className = '',
+  catalogRegions,
+  catalogStates,
 }) => {
-  const [regions, setRegions] = useState<GeoRegion[]>([]);
-  const [states, setStates] = useState<GeoState[]>([]);
+  const usesCatalog = catalogRegions !== undefined && catalogStates !== undefined;
+
+  const [fetchedRegions, setFetchedRegions] = useState<GeoRegion[]>([]);
+  const [fetchedStates, setFetchedStates] = useState<GeoState[]>([]);
   const [districts, setDistricts] = useState<GeoDistrict[]>([]);
-  const [loadingRegions, setLoadingRegions] = useState(true);
-  const [loadingStates, setLoadingStates] = useState(true);
+  const [loadingRegions, setLoadingRegions] = useState(!usesCatalog);
+  const [loadingStates, setLoadingStates] = useState(!usesCatalog);
   const [loadingDistricts, setLoadingDistricts] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    setLoadingRegions(true);
-    api.get('/api/internal/geo/regions')
-      .then((res) => { if (active) setRegions(res.data.data ?? []); })
-      .finally(() => { if (active) setLoadingRegions(false); });
-    return () => { active = false; };
-  }, []);
+  const regions = usesCatalog ? catalogRegions : fetchedRegions;
+  const states = useMemo(
+    () => filterStatesByRegion(usesCatalog ? catalogStates! : fetchedStates, regionId),
+    [usesCatalog, catalogStates, fetchedStates, regionId],
+  );
 
   useEffect(() => {
+    if (usesCatalog) return;
+
+    let active = true;
+    setLoadingRegions(true);
+    loadRegions()
+      .then((data) => { if (active) setFetchedRegions(data); })
+      .finally(() => { if (active) setLoadingRegions(false); });
+    return () => { active = false; };
+  }, [usesCatalog]);
+
+  useEffect(() => {
+    if (usesCatalog) {
+      if (stateId && !states.some((state) => state.id === stateId)) {
+        onChange(regionId, '', '');
+      }
+      return;
+    }
+
     let active = true;
     setLoadingStates(true);
-    const params = regionId ? { regionId } : {};
-    api.get('/api/internal/geo/states', { params })
-      .then((res) => {
+    loadStates(regionId || undefined)
+      .then((nextStates) => {
         if (!active) return;
-        const nextStates: GeoState[] = res.data.data ?? [];
-        setStates(nextStates);
+        setFetchedStates(nextStates);
         if (stateId && !nextStates.some((state) => state.id === stateId)) {
           onChange(regionId, '', '');
         }
@@ -53,7 +78,7 @@ const RegionStateDistrictSelect: React.FC<Props> = ({
       .finally(() => { if (active) setLoadingStates(false); });
     return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [regionId]);
+  }, [usesCatalog, regionId, catalogStates]);
 
   useEffect(() => {
     if (!stateId) {

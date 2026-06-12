@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import prisma from '../prisma/client';
 import { AuthenticatedRequest } from '../middleware/auth';
+import { clearRegionStateCache } from '../utils/geographyCache';
 
 const regionSelect = {
   id: true,
@@ -48,6 +49,7 @@ async function syncRegionStates(regionId: string, stateIds: string[]) {
   await prisma.regionState.createMany({
     data: stateIds.map((stateId) => ({ regionId, stateId })),
   });
+  clearRegionStateCache();
 }
 
 export async function getRegions(_req: AuthenticatedRequest, res: Response) {
@@ -90,7 +92,6 @@ export async function createRegion(req: AuthenticatedRequest, res: Response) {
       const refreshed = await prisma.region.findUnique({ where: { id: region.id }, select: regionSelect });
       return res.status(201).json({ success: true, data: mapRegion(refreshed!) });
     }
-
     return res.status(201).json({ success: true, data: mapRegion(region) });
   } catch (error) {
     console.error('createRegion error:', error);
