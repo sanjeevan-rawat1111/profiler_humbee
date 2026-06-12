@@ -5,8 +5,8 @@ const mobileNumberField = z.string().trim()
   .regex(/^[0-9]{10}$/, 'Please enter a valid 10-digit Mobile Number.');
 
 const geoFields = {
-  stateId: z.string().trim().uuid('Please select a valid State'),
-  districtId: z.string().trim().uuid('Please select a valid District'),
+  stateId: z.string().trim().min(1, 'Please select a valid State'),
+  districtId: z.string().trim().min(1, 'Please select a valid District'),
 };
 
 export const loginSchema = z.object({
@@ -87,13 +87,13 @@ export const updateUserSchema = z.object({
 export const regionSchema = z.object({
   regionName: z.string().trim().min(1, 'Region name is required'),
   status: z.enum(['active', 'inactive']).optional().default('active'),
-  stateIds: z.array(z.string().uuid()).optional().default([]),
+  stateIds: z.array(z.string().trim().min(1)).optional().default([]),
 });
 
 export const updateRegionSchema = z.object({
   regionName: z.string().trim().min(1, 'Region name is required').optional(),
   status: z.enum(['active', 'inactive']).optional(),
-  stateIds: z.array(z.string().uuid()).optional(),
+  stateIds: z.array(z.string().trim().min(1)).optional(),
 });
 
 export const submissionsQuerySchema = z.object({

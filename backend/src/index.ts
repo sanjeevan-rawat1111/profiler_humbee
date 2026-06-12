@@ -9,6 +9,9 @@ import authRoutes from './routes/auth';
 import submissionRoutes from './routes/submission';
 import internalRoutes from './routes/internal';
 import prisma from './prisma/client';
+import { initStaticGeography } from './data/staticGeography';
+
+initStaticGeography();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import prisma from '../prisma/client';
 import { AuthenticatedRequest } from '../middleware/auth';
+import { getStateById, isValidStateId } from '../data/staticGeography';
 import { clearRegionStateCache } from '../utils/geographyCache';
 
 const regionSelect = {
@@ -11,11 +12,7 @@ const regionSelect = {
   createdAt: true,
   updatedAt: true,
   regionStates: {
-    select: {
-      state: {
-        select: { id: true, stateName: true, stateCode: true },
-      },
-    },
+    select: { stateId: true },
   },
 } as const;
 
@@ -26,8 +23,13 @@ function mapRegion(region: {
   status: string;
   createdAt: Date;
   updatedAt: Date;
-  regionStates: { state: { id: string; stateName: string; stateCode: string } }[];
+  regionStates: { stateId: string }[];
 }) {
+  const states = region.regionStates
+    .map((entry) => getStateById(entry.stateId))
+    .filter(Boolean)
+    .sort((a, b) => a!.stateName.localeCompare(b!.stateName));
+
   return {
     id: region.id,
     regionName: region.regionName,
@@ -35,19 +37,22 @@ function mapRegion(region: {
     status: region.status,
     createdAt: region.createdAt.toISOString(),
     updatedAt: region.updatedAt.toISOString(),
-    stateCount: region.regionStates.length,
-    states: region.regionStates
-      .map((entry) => entry.state)
-      .sort((a, b) => a.stateName.localeCompare(b.stateName)),
+    stateCount: states.length,
+    states,
   };
+}
+
+function normalizeStateIds(stateIds: string[]) {
+  return [...new Set(stateIds.filter((stateId) => isValidStateId(stateId)))];
 }
 
 async function syncRegionStates(regionId: string, stateIds: string[]) {
   await prisma.regionState.deleteMany({ where: { regionId } });
-  if (!stateIds.length) return;
+  const validStateIds = normalizeStateIds(stateIds);
+  if (!validStateIds.length) return;
 
   await prisma.regionState.createMany({
-    data: stateIds.map((stateId) => ({ regionId, stateId })),
+    data: validStateIds.map((stateId) => ({ regionId, stateId })),
   });
   clearRegionStateCache();
 }
@@ -69,7 +74,7 @@ export async function createRegion(req: AuthenticatedRequest, res: Response) {
   const regionName = String(req.body.regionName || '').trim();
   const status = String(req.body.status || 'active').trim() === 'inactive' ? 'inactive' : 'active';
   const stateIds = Array.isArray(req.body.stateIds)
-    ? [...new Set(req.body.stateIds.map((value: unknown) => String(value).trim()).filter(Boolean))] as string[]
+    ? normalizeStateIds(req.body.stateIds.map((value: unknown) => String(value).trim()).filter(Boolean))
     : [];
 
   if (!regionName) {
@@ -106,7 +111,7 @@ export async function updateRegion(req: AuthenticatedRequest, res: Response) {
     ? (String(req.body.status).trim() === 'inactive' ? 'inactive' : 'active')
     : undefined;
   const stateIds = Array.isArray(req.body.stateIds)
-    ? [...new Set(req.body.stateIds.map((value: unknown) => String(value).trim()).filter(Boolean))] as string[]
+    ? normalizeStateIds(req.body.stateIds.map((value: unknown) => String(value).trim()).filter(Boolean))
     : undefined;
 
   try {
@@ -156,6 +161,7 @@ export async function deleteRegion(req: AuthenticatedRequest, res: Response) {
     }
 
     await prisma.region.delete({ where: { id } });
+    clearRegionStateCache();
     return res.status(200).json({ success: true, message: 'Region deleted' });
   } catch (error) {
     console.error('deleteRegion error:', error);

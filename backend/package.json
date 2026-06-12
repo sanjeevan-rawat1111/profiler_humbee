@@ -4,7 +4,7 @@
   "description": "Humbee App Backend",
   "main": "dist/index.js",
   "scripts": {
-    "build": "rimraf dist && tsc",
+    "build": "rimraf dist && tsc && mkdir -p dist/data && cp src/data/humbeeGeography.csv dist/data/humbeeGeography.csv",
     "start": "node dist/index.js",
     "dev": "tsnd --respawn --transpile-only src/index.ts",
     "postinstall": "prisma generate",

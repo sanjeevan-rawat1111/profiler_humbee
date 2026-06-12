@@ -1,7 +1,19 @@
 import { Response } from 'express';
 import prisma from '../prisma/client';
 import { AuthenticatedRequest } from '../middleware/auth';
+import {
+  filterDistricts,
+  filterStates,
+  getStateById,
+} from '../data/staticGeography';
 import { resolveRegionStateIds } from '../utils/geographyScope';
+
+async function loadStateRegionIdMap(): Promise<Map<string, string | null>> {
+  const mappings = await prisma.regionState.findMany({
+    select: { stateId: true, regionId: true },
+  });
+  return new Map(mappings.map((mapping) => [mapping.stateId, mapping.regionId]));
+}
 
 export async function getRegions(req: AuthenticatedRequest, res: Response) {
   try {
@@ -29,36 +41,23 @@ export async function getStates(req: AuthenticatedRequest, res: Response) {
   const regionId = String(req.query.regionId || '').trim();
   try {
     const scope = req.geographyScope;
-    const where: Record<string, unknown> = {};
+    const regionStateIds = regionId ? await resolveRegionStateIds(regionId) : undefined;
 
-    if (regionId) {
-      const regionStateIds = await resolveRegionStateIds(regionId);
-      where.id = { in: regionStateIds.length ? regionStateIds : ['__none__'] };
-    }
-    if (scope && !scope.unrestricted && scope.stateIds.length) {
-      const currentIds = (where.id as { in: string[] } | undefined)?.in;
-      where.id = currentIds
-        ? { in: currentIds.filter((id) => scope.stateIds.includes(id)) }
-        : { in: scope.stateIds };
-    } else if (scope && !scope.unrestricted) {
-      where.id = { in: ['__none__'] };
-    }
-
-    const states = await prisma.state.findMany({
-      where,
-      select: { id: true, stateName: true, stateCode: true },
-      orderBy: { stateName: 'asc' },
+    let states = filterStates({
+      regionStateIds: regionStateIds?.length ? regionStateIds : regionId ? ['__none__'] : undefined,
     });
 
-    const statesWithRegion = await Promise.all(
-      states.map(async (state) => {
-        const mapping = await prisma.regionState.findUnique({
-          where: { stateId: state.id },
-          select: { regionId: true },
-        });
-        return { ...state, regionId: mapping?.regionId ?? null };
-      }),
-    );
+    if (scope && !scope.unrestricted && scope.stateIds.length) {
+      states = states.filter((state) => scope.stateIds.includes(state.id));
+    } else if (scope && !scope.unrestricted) {
+      states = [];
+    }
+
+    const regionMap = await loadStateRegionIdMap();
+    const statesWithRegion = states.map((state) => ({
+      ...state,
+      regionId: regionMap.get(state.id) ?? null,
+    }));
 
     return res.status(200).json({ success: true, data: statesWithRegion });
   } catch (error) {
@@ -75,23 +74,16 @@ export async function getDistrictsByState(req: AuthenticatedRequest, res: Respon
 
   try {
     const scope = req.geographyScope;
-    const state = await prisma.state.findUnique({ where: { id: stateId } });
-    if (!state) {
+    if (!getStateById(stateId)) {
       return res.status(404).json({ success: false, message: 'State not found' });
     }
 
-    const where: Record<string, unknown> = { stateId };
+    let districts = filterDistricts({ stateId });
     if (scope && !scope.unrestricted && scope.districtIds.length) {
-      where.id = { in: scope.districtIds };
+      districts = districts.filter((district) => scope.districtIds.includes(district.id));
     } else if (scope && !scope.unrestricted) {
-      where.id = { in: ['__none__'] };
+      districts = [];
     }
-
-    const districts = await prisma.district.findMany({
-      where,
-      select: { id: true, districtName: true, districtCode: true, stateId: true },
-      orderBy: { districtName: 'asc' },
-    });
 
     return res.status(200).json({ success: true, data: districts });
   } catch (error) {

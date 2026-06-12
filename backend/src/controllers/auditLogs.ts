@@ -6,6 +6,11 @@ import { sendCsv, sendExcel } from '../utils/exportHelpers';
 import { parseArrayParam } from '../utils/dashboardAnalytics';
 import { parsePeriodQuery, periodToDateRange } from '../utils/datePeriod';
 import { GeographyScope, resolveRegionStateIds } from '../utils/geographyScope';
+import {
+  filterDistricts,
+  getDistrictById,
+  getStateById,
+} from '../data/staticGeography';
 
 type AuditEventRow = {
   id: string;
@@ -53,21 +58,20 @@ async function buildAuditWhere(query: Record<string, unknown>, scope?: Geography
 
   if (regionId) {
     const regionStateIds = await resolveRegionStateIds(regionId);
-    const regionStates = await prisma.state.findMany({
-      where: { id: { in: regionStateIds } },
-      select: { stateName: true },
-    });
-    if (regionStates.length) {
-      andClauses.push({ state: { in: regionStates.map((s) => s.stateName) } });
+    const regionStateNames = regionStateIds
+      .map((id) => getStateById(id)?.stateName)
+      .filter(Boolean) as string[];
+    if (regionStateNames.length) {
+      andClauses.push({ state: { in: regionStateNames } });
     } else {
       andClauses.push({ state: '__none__' });
     }
   } else if (stateId) {
-    const state = await prisma.state.findUnique({ where: { id: stateId } });
+    const state = getStateById(stateId);
     if (state) andClauses.push({ state: state.stateName });
   }
   if (districtId) {
-    const district = await prisma.district.findUnique({ where: { id: districtId } });
+    const district = getDistrictById(districtId);
     if (district) {
       if (!stateId || district.stateId === stateId) {
         andClauses.push({ district: district.districtName });
@@ -80,11 +84,9 @@ async function buildAuditWhere(query: Record<string, unknown>, scope?: Geography
     if (!scope.districtIds.length) {
       andClauses.push({ district: '__none__' });
     } else {
-      const scopedDistricts = await prisma.district.findMany({
-        where: { id: { in: scope.districtIds } },
-        select: { districtName: true },
-      });
-      andClauses.push({ district: { in: scopedDistricts.map((d) => d.districtName) } });
+      const scopedDistrictNames = filterDistricts({ ids: scope.districtIds })
+        .map((district) => district.districtName);
+      andClauses.push({ district: { in: scopedDistrictNames.length ? scopedDistrictNames : ['__none__'] } });
     }
   }
 

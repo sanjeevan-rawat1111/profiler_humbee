@@ -2,6 +2,12 @@ import prisma from '../prisma/client';
 import { excludedAnalyticsMobileNumbers } from '../config/excludedAnalyticsUsers';
 import type { SubmissionRow, parseFilterQuery } from './submissionFilters';
 import { getCache, setCache, isCacheValid } from './geographyCache';
+import {
+  filterDistricts,
+  filterStates,
+  getAllStates,
+  getDistrictIdsForStateIds,
+} from '../data/staticGeography';
 
 export type GeographyScope = {
   unrestricted: boolean;
@@ -60,16 +66,9 @@ export async function resolveGeographyScope(userId: string, role: string): Promi
   });
   const stateIds = [...new Set(stateMappings.map((mapping) => mapping.stateId))];
 
-  const districts = stateIds.length
-    ? await prisma.district.findMany({
-      where: { stateId: { in: stateIds } },
-      select: { id: true },
-    })
-    : [];
-
   return {
     unrestricted: false,
-    districtIds: districts.map((district) => district.id),
+    districtIds: getDistrictIdsForStateIds(stateIds),
     stateIds,
     regionIds,
   };
@@ -136,19 +135,16 @@ export async function loadStateRegionMap(): Promise<Map<string, { regionId: stri
     return cache.stateRegionMap;
   }
 
-  const [mappings, allStates] = await Promise.all([
-    prisma.regionState.findMany({
-      select: {
-        stateId: true,
-        regionId: true,
-        region: { select: { regionName: true } },
-      },
-    }),
-    prisma.state.findMany({ select: { id: true } }),
-  ]);
+  const mappings = await prisma.regionState.findMany({
+    select: {
+      stateId: true,
+      regionId: true,
+      region: { select: { regionName: true } },
+    },
+  });
 
   const map = new Map<string, { regionId: string | null; regionName: string }>();
-  allStates.forEach((state) => {
+  getAllStates().forEach((state) => {
     map.set(state.id, { regionId: null, regionName: 'Unassigned' });
   });
   mappings.forEach((mapping) => {
@@ -164,28 +160,27 @@ export async function loadStateRegionMap(): Promise<Map<string, { regionId: stri
 
 export async function buildScopedFilterOptions(scope: GeographyScope, regionId: string, stateId: string) {
   const regionStateIds = regionId ? await resolveRegionStateIds(regionId) : [];
-  const stateWhere: Record<string, unknown> = {};
-  const districtWhere: Record<string, unknown> = {};
 
-  if (regionId) {
-    stateWhere.id = { in: regionStateIds.length ? regionStateIds : ['__none__'] };
-  }
+  let states = filterStates({
+    regionStateIds: regionId ? (regionStateIds.length ? regionStateIds : ['__none__']) : undefined,
+  });
   if (!scope.unrestricted && scope.stateIds.length) {
-    stateWhere.id = stateWhere.id
-      ? { in: (stateWhere.id as { in: string[] }).in.filter((id) => scope.stateIds.includes(id)) }
-      : { in: scope.stateIds };
+    states = states.filter((state) => scope.stateIds.includes(state.id));
+  } else if (!scope.unrestricted) {
+    states = [];
   }
-  if (stateId) districtWhere.stateId = stateId;
+
+  let districts = stateId ? filterDistricts({ stateId }) : [];
   if (!scope.unrestricted && scope.districtIds.length) {
-    districtWhere.id = { in: scope.districtIds };
+    districts = districts.filter((district) => scope.districtIds.includes(district.id));
   }
 
   const userWhere: Record<string, unknown> = {
     role: 'user',
     mobileNumber: { notIn: excludedAnalyticsMobileNumbers() },
   };
-  if (districtWhere.id) {
-    userWhere.districtId = districtWhere.id;
+  if (districts.length && !scope.unrestricted && scope.districtIds.length) {
+    userWhere.districtId = { in: districts.map((district) => district.id) };
   } else if (stateId) {
     userWhere.stateId = stateId;
   } else if (regionId) {
@@ -196,7 +191,7 @@ export async function buildScopedFilterOptions(scope: GeographyScope, regionId: 
     userWhere.stateId = { in: scope.stateIds };
   }
 
-  const [regions, states, districts, dbUsers] = await Promise.all([
+  const [regions, dbUsers, mappings] = await Promise.all([
     prisma.region.findMany({
       where: scope.unrestricted
         ? { status: 'active' }
@@ -206,45 +201,17 @@ export async function buildScopedFilterOptions(scope: GeographyScope, regionId: 
       select: { id: true, regionName: true, regionCode: true },
       orderBy: { regionName: 'asc' },
     }),
-    prisma.state.findMany({
-      where: stateWhere,
-      select: { id: true, stateName: true, stateCode: true },
-      orderBy: { stateName: 'asc' },
-    }),
-    stateId
-      ? prisma.district.findMany({
-        where: districtWhere,
-        select: { id: true, districtName: true, districtCode: true, stateId: true },
-        orderBy: { districtName: 'asc' },
-      })
-      : Promise.resolve([]),
     prisma.user.findMany({
       where: userWhere,
       select: { name: true, mobileNumber: true, stateId: true, districtId: true, state: true, district: true },
       orderBy: { mobileNumber: 'asc' },
     }),
+    prisma.regionState.findMany({
+      select: { stateId: true, regionId: true },
+    }),
   ]);
 
-  // const statesWithRegion = await Promise.all(
-  //   states.map(async (state) => {
-  //     const mapping = await prisma.regionState.findUnique({
-  //       where: { stateId: state.id },
-  //       select: { regionId: true },
-  //     });
-  //     return { ...state, regionId: mapping?.regionId ?? null };
-  //   }),
-  // );
-  const mappings = await prisma.regionState.findMany({
-    select: {
-      stateId: true,
-      regionId: true,
-    },
-  });
-  
-  const mappingMap = new Map(
-    mappings.map((m) => [m.stateId, m.regionId])
-  );
-  
+  const mappingMap = new Map(mappings.map((m) => [m.stateId, m.regionId]));
   const statesWithRegion = states.map((state) => ({
     ...state,
     regionId: mappingMap.get(state.id) ?? null,

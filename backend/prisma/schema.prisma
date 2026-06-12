@@ -26,7 +26,6 @@ model RegionState {
   regionId String @map("region_id")
   stateId  String @unique @map("state_id")
   region   Region @relation(fields: [regionId], references: [id], onDelete: Cascade)
-  state    State  @relation(fields: [stateId], references: [id], onDelete: Cascade)
 
   @@index([regionId])
   @@map("region_states")
@@ -45,30 +44,6 @@ model UserRegion {
   @@map("user_regions")
 }
 
-model State {
-  id           String        @id @default(uuid())
-  stateName    String        @unique @map("state_name")
-  stateCode    String        @unique @map("state_code")
-  districts    District[]
-  users        User[]
-  regionStates RegionState[]
-
-  @@map("states")
-}
-
-model District {
-  id           String @id @default(uuid())
-  districtName String @map("district_name")
-  districtCode String @unique @map("district_code")
-  stateId      String @map("state_id")
-  state        State  @relation(fields: [stateId], references: [id], onDelete: Restrict)
-  users        User[]
-
-  @@unique([stateId, districtName])
-  @@index([stateId])
-  @@map("districts")
-}
-
 model User {
   id            String       @id @default(uuid())
   name          String
@@ -84,8 +59,6 @@ model User {
   status        String       @default("active") // "active" or "inactive"
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
-  stateRef      State?       @relation(fields: [stateId], references: [id], onDelete: Restrict)
-  districtRef   District?    @relation(fields: [districtId], references: [id], onDelete: Restrict)
   submissions   Submission[]
   auditLogs     AuditLog[]
   userRegions   UserRegion[]
